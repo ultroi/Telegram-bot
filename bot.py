@@ -168,6 +168,15 @@ async def join(update: Update, context: CallbackContext) -> None:
     else:
         await update.message.reply_text("You are already in the game.")
 
+
+def start_new_game(chat_id):
+    games[chat_id] = {
+        'players': [],
+        'roles': ['Raja', 'Chor', 'Sipahi', 'Mantri'],
+        'current_round': 0,
+        'mantri_id': None
+    }
+
 async def start_game(update: Update, context: CallbackContext) -> None:
     chat_id = update.message.chat_id
 
@@ -199,11 +208,18 @@ async def start_game(update: Update, context: CallbackContext) -> None:
         except Exception as e:
             print(f"Failed to send role message to player {player_id}: {e}")
 
-    # Notify the group
-    try:
-        await context.bot.send_message(chat_id, text="Roles have been assigned. Check your private messages.")
-    except Exception as e:
-        print(f"Failed to send group message: {e}")
+    # Notify the group with role assignment and game details
+    player_names = {player_id: (await context.bot.get_chat(player_id)).first_name for player_id in players}
+    player_points = {player_id: get_player_score(player_id) for player_id in players}
+    
+    game_start_message = (
+        f"Roles have been assigned. Check your private messages.\n\n"
+        f"Total Rounds: 5\n"
+        f"Ongoing Round: 1\n\n"
+        f"Players:\n"
+        + "\n".join([f"{name}: {player_points[player_id]} points" for player_id, name in player_names.items()])
+    )
+    await context.bot.send_message(chat_id, text=game_start_message)
 
     # Example scoring mechanism
     for player_id, role in roles_assigned.items():
@@ -229,13 +245,35 @@ async def start_game(update: Update, context: CallbackContext) -> None:
         await context.bot.send_message(chat_id, text="Game over!")
         reset_game(chat_id)
 
-def start_new_game(chat_id):
-    games[chat_id] = {
-        'players': [],
-        'roles': ['Raja', 'Chor', 'Sipahi', 'Mantri'],
-        'current_round': 0,
-        'mantri_id': None
-    }
+async def end_round(chat_id, context: CallbackContext) -> None:
+    game = games.get(chat_id)
+    if not game:
+        return
+
+    # Update the game state or proceed to the next round
+    current_round = game['current_round']
+    game['current_round'] += 1
+
+    if game['current_round'] < 5:
+        # Notify group about the end of the round and start of the new round
+        player_names = {player_id: (await context.bot.get_chat(player_id)).first_name for player_id in game['players']}
+        player_points = {player_id: get_player_score(player_id) for player_id in game['players']}
+
+        round_end_message = (
+            f"Round {current_round} has ended.\n"
+            f"Round {game['current_round']} has started.\n\n"
+            f"Total Rounds: 5\n"
+            f"Ongoing Round: {game['current_round']}\n\n"
+            f"Players:\n"
+            + "\n".join([f"{name}: {player_points[player_id]} points" for player_id, name in player_names.items()])
+        )
+        await context.bot.send_message(chat_id, text=round_end_message)
+
+        # Assign new roles if needed
+        await assign_roles(chat_id, context)
+    else:
+        await context.bot.send_message(chat_id, text="Game has ended.")
+        reset_game(chat_id)
 
 async def assign_roles(chat_id, context: CallbackContext) -> None:
     game = games.get(chat_id)
@@ -261,7 +299,11 @@ async def guess(update: Update, context: CallbackContext) -> None:
     chat_id = update.message.chat_id
     game = games.get(chat_id)
 
-    if not game or user.id != game['mantri_id']:
+    if not game:
+        await update.message.reply_text("No game is currently running in this chat.")
+        return
+
+    if user.id != game['mantri_id']:
         await update.message.reply_text("You are not the Mantri or the game is not active.")
         return
 
@@ -269,16 +311,54 @@ async def guess(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("Please use /guess <player_name>")
         return
 
-    # List player names and create inline keyboard options
-    player_names = [await (await context.bot.get_chat(player_id)).first_name for player_id in game['players']]
-    keyboard = [[InlineKeyboardButton(name, callback_data=name)] for name in player_names]
+    guessed_player_name = context.args[0]
 
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await context.bot.send_message(
-        chat_id,
-        text="Guess who is the Chor?",
-        reply_markup=reply_markup
+    # Get player names and roles
+    player_names = {player_id: (await context.bot.get_chat(player_id)).first_name for player_id in game['players']}
+    player_roles = {player_id: role for player_id, role in zip(game['players'], game['roles'])}
+    guessed_player_id = next(
+        (player_id for player_id, name in player_names.items() if name == guessed_player_name), 
+        None
     )
+
+    if guessed_player_id is None:
+        await update.message.reply_text("Invalid guess. Please use /guess <player_name>")
+        return
+
+    actual_chor_id = next(
+        (player_id for player_id, role in player_roles.items() if role == "Chor"), 
+        None
+    )
+    actual_chor_name = player_names[actual_chor_id]
+
+    # Send result to group chat
+    if guessed_player_id == actual_chor_id:
+        result_message = f"Correct guess! {guessed_player_name} is the Chor."
+    else:
+        result_message = f"Wrong guess! {guessed_player_name} is not the Chor. {actual_chor_name} is the actual Chor."
+
+    # Reveal all players' identities and roles in the group chat
+    all_player_info = "\n".join(
+        [f"{player_names[player_id]}: {player_roles[player_id]}" for player_id in game['players']]
+    )
+    result_message += f"\n\nHere are the roles of all players:\n{all_player_info}"
+    
+    await context.bot.send_message(chat_id, text=result_message)
+
+    # Send roles privately to the Mantri
+    mantri_roles = "\n".join(
+        [f"{player_names[player_id]}: {player_roles[player_id]}" for player_id in game['players']]
+    )
+    await context.bot.send_message(game['mantri_id'], text=f"Roles of all players:\n{mantri_roles}")
+
+    # Show scoreboard
+    scores = "\n".join(
+        [f"{(await context.bot.get_chat(player_id)).first_name}: {get_player_score(player_id)}" for player_id in game['players']]
+    )
+    await context.bot.send_message(chat_id, text=f"Scoreboard:\n{scores}")
+
+    await end_round(chat_id, context)
+
 
 # Callback function to handle button presses
 async def handle_guess_selection(update: Update, context: CallbackContext) -> None:
@@ -324,21 +404,6 @@ if __name__ == '__main__':
     application.add_handler(CallbackQueryHandler(handle_guess_selection))
 
     application.run_polling()
-
-async def end_round(chat_id, context: CallbackContext) -> None:
-    game = games.get(chat_id)
-    if not game:
-        return
-
-    # Update the game state or proceed to the next round
-    game['current_round'] += 1
-    if game['current_round'] < 5:
-        await context.bot.send_message(chat_id, text=f"Round {game['current_round']} has ended. Starting next round...")
-        # Assign new roles if needed
-        await assign_roles(chat_id, context)
-    else:
-        await context.bot.send_message(chat_id, text="Game has ended.")
-        reset_game(chat_id)
 
 # Main function to run the bot
 if __name__ == '__main__':
