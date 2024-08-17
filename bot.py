@@ -56,6 +56,10 @@ def reset_database():
     except sqlite3.Error as e:
         print(f"Error resetting database: {e}")
 
+async def some_function():
+    # Code block
+    
+
 # Dictionary to store game states
 games = {}
 
@@ -197,7 +201,10 @@ async def assign_roles(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     await end_round(chat_id, context)
 
+
+
 async def end_round(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Your code here pass
     game = games.get(chat_id)
     if not game:
         return
