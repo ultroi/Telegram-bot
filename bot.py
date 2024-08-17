@@ -59,21 +59,20 @@ async def send_message(update: Update, context: CallbackContext):
         parse_mode=ParseMode.HTML  # or ParseMode.MARKDOWN, depending on your needs
     )
 
-async def scheduled_task(context: CallbackContext):
-    chat_id = context.job.context['chat_id']
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text="This is a scheduled message."
-    )
+
+def callback(context: CallbackContext):
+    chat_id = context.job.context
+    # Your logic here
 
 def start_scheduled_job(job_queue: JobQueue, chat_id: int):
     job_queue.run_repeating(
-        callback=partial(scheduled_task),
-        interval=3600,  # Interval in seconds (e.g., 3600 seconds = 1 hour)
+        callback,  # Your callback function
+        interval=60,  # Interval in seconds
         first=0,  # Start immediately
-        context={'chat_id': chat_id}  # Pass context using a dictionary
+        context=chat_id  # Pass context if needed
     )
 
+ 
 def has_interacted(user_id):
     try:
         with sqlite3.connect('game.db') as conn:
