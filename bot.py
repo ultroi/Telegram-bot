@@ -1,5 +1,19 @@
 from dotenv import load_dotenv
 import os
+
+# Load the .env file
+load_dotenv(dotenv_path='.env')
+
+# Get the token from the .env file
+Token = os.getenv("BOT_TOKEN")
+
+# Print the token for debugging
+print(f"Token: {Token}")
+
+# Check if the token is None
+if not Token:
+    raise ValueError("No token found. Please check your .env file.")
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackContext
 import random
