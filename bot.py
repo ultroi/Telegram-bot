@@ -29,6 +29,25 @@ c.execute('''CREATE TABLE IF NOT EXISTS games (game_id INTEGER PRIMARY KEY, curr
 # Commit changes and close the connection
 conn.commit()
 
+# Check if the user has interacted
+def has_interacted(user_id):
+    conn = sqlite3.connect('game.db')
+    c = conn.cursor()
+    c.execute("SELECT notified FROM players WHERE user_id=?", (user_id,))
+    result = c.fetchone()
+    conn.close()
+    if result and result[0] == 1:
+        return True
+    return False
+
+# Mark user as interacted
+def mark_as_interacted(user_id):
+    conn = sqlite3.connect('game.db')
+    c = conn.cursor()
+    c.execute("INSERT OR REPLACE INTO players (user_id, notified) VALUES (?, 1)", (user_id,))
+    conn.commit()
+    conn.close()
+
 # Function to add or update player score
 def update_player_score(user_id, score):
     try:
@@ -59,6 +78,36 @@ def reset_database():
 async def some_function():
     # Code inside the function should be indented
     print("Hello, world!")
+
+def get_player_data(user_id):
+    conn = sqlite3.connect('game.db')
+    c = conn.cursor()
+    
+    try:
+        c.execute("SELECT * FROM players WHERE user_id=?", (user_id,))
+        player = c.fetchone()
+        if player is None:
+            return None
+        return player
+    except sqlite3.OperationalError as e:
+        print(f"Database error: {e}")
+        return None
+    finally:
+        conn.close()
+
+def update_player_notified(user_id, notified_status):
+    conn = sqlite3.connect('game.db')
+    c = conn.cursor()
+    
+    try:
+        c.execute("UPDATE players SET notified=? WHERE user_id=?", (notified_status, user_id))
+        conn.commit()
+    except sqlite3.OperationalError as e:
+        print(f"Database error: {e}")
+    finally:
+        conn.close()
+
+
 
 # Dictionary to store game states
 games = {}
@@ -114,35 +163,36 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         else:
             await update.message.reply_text("Please send me a message in private chat first to interact with the bot.")
 
-async def startgame(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def startgame(update: Update, context: CallbackContext) -> None:
     chat_id = update.message.chat_id
-    if update.message.chat.type != 'private':
-        if context.user_data.get('interacted'):
+    user = update.message.from_user
+
+    # Check if the user has interacted
+    if has_interacted(user.id):
+        if update.message.chat.type != 'private':
             await update.message.reply_text("Game is starting! Use /join to participate. You have 1.5 minutes to join.")
             context.job_queue.run_once(remind_join, 60, chat_id=chat_id)
             context.job_queue.run_once(check_start_game, 90, chat_id=chat_id)
             start_new_game(chat_id)  # Initialize the game state
         else:
-            await update.message.reply_text("Please interact with the bot in private chat first.")
+            await update.message.reply_text("You can only use /startgame in a group chat.")
     else:
-        await update.message.reply_text("You can only use /startgame in a group chat.")
+        await update.message.reply_text("Please interact with the bot in private chat first.")
 
-async def join(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def join(update: Update, context: CallbackContext) -> None:
     chat_id = update.message.chat_id
     user = update.message.from_user
-    
+
     if chat_id not in games:
         await update.message.reply_text("No game is currently running in this chat.")
         return
-    
+
     if user.id not in games[chat_id]['players']:
         games[chat_id]['players'].append(user.id)
         update_player_score(user.id, 0)  # Initialize player score in database
-        # Ensure user is marked as notified
-        c.execute('INSERT OR REPLACE INTO players (user_id, score, notified) VALUES (?, ?, ?)', (user.id, get_player_score(user.id), 1))
-        conn.commit()
+        mark_as_interacted(user.id)  # Mark user as interacted
         await update.message.reply_text(f"{user.first_name} joined the game!")
-        
+
         if len(games[chat_id]['players']) == 4:
             await start_game(chat_id, context)
     else:
