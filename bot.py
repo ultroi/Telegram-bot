@@ -143,7 +143,7 @@ async def check_start_game(context: CallbackContext) -> None:
         reset_game(chat_id)  # Reset the game state
         await context.bot.send_message(chat_id, text="Use /startgame to start a new game.")
     elif game and len(game['players']) == 4:
-        await start_game(chat_id, context)
+        await startgame(chat_id, context)
     else:
         await context.bot.send_message(chat_id, text="Game state error. Please use /startgame to start a new game.")
 
