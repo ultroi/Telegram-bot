@@ -144,7 +144,7 @@ def reset_game() -> None:
     mantri_id = None
 
 def main() -> None:
-    application = Application.builder().token().build()
+    application = Application.builder().token(Token).build()
     
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("startgame", startgame))
