@@ -1,6 +1,6 @@
-import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from dotenv import load_dotenv
+import os
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackContext
 import random
 
