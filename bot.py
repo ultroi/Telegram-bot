@@ -58,26 +58,28 @@ async def send_message(update: Update, context: CallbackContext):
         parse_mode=ParseMode.HTML  # or ParseMode.MARKDOWN, depending on your needs
     )
 
-
-async def schedule_task(task, delay):
+def start_scheduled_job(job_queue: JobQueue, chat_id: int):
     """
-    Schedules a task to be executed after a specified delay.
+    Schedules a task to be executed periodically or at a specific time.
 
-    :param task: The function to be executed.
-    :param delay: The delay in seconds before the task is executed.
+    :param job_queue: The JobQueue instance from the application.
+    :param chat_id: The chat ID where the scheduled task will operate.
     """
-    await asyncio.sleep(delay)
-    await task()
-
-# Example task function
-async def example_task():
-    print("Task executed!")
-
-# Example usage
-async def main():
-    await schedule_task(example_task, 10)  # Schedule `example_task` to run after 10 seconds
-
-
+    # Define the callback function for the scheduled job
+    async def scheduled_task(context: CallbackContext):
+        # Example task: send a message to the chat
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="This is a scheduled message."
+        )
+    
+    # Schedule the job
+    job_queue.run_repeating(
+        callback=scheduled_task,
+        interval=3600,  # Interval in seconds (e.g., 3600 seconds = 1 hour)
+        first=0,  # Start immediately
+        context={'chat_id': chat_id}  # Pass context using a dictionary
+    )
 
 def start_scheduled_job(job_queue: JobQueue, chat_id: int):
     job_queue.run_once(
