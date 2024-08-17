@@ -139,6 +139,7 @@ async def start(update: Update, context: CallbackContext) -> None:
                 "You can start by using the following commands:\n\n"
                 "/startgame - Start a new game in a group chat\n"
                 "/join - Join an ongoing game\n"
+                "/leave - you can left game\n"
                 "/guess <player_name> - Mantri guesses the Chor\n"
                 "/help - Show this help message\n\n"
                 "Feel free to explore and let me know how I can help you today!"
@@ -155,11 +156,11 @@ async def check_start_game(context: CallbackContext) -> None:
     if game and len(game['players']) < 4:
         await context.bot.send_message(chat_id, text="Not enough players joined. The game is ending.")
         reset_game(chat_id)
-        await context.bot.send_message(chat_id, text="Use /startgame to start a new game.")
+        await context.bot.send_message(chat_id, text="Use /startgame@whothiefbot to start a new game.")
     elif game and len(game['players']) == 4:
         await start_game(context.job.context['update'], context)
     else:
-        await context.bot.send_message(chat_id, text="Game state error. Please use /startgame to start a new game.")
+        await context.bot.send_message(chat_id, text="Game state error. Please use /startgame@whothiefbot to start a new game.")
 
 
 
@@ -207,7 +208,7 @@ async def start_game(update: Update, context: CallbackContext) -> None:
     players = game['players']
     
     if len(players) < 4:
-        await context.bot.send_message(chat_id, text="Not enough players to start the game. Need at least 4 players.")
+        await context.bot.send_message(chat_id, text="Not enough players!! Need at least 4 players. Use /join@whothiefbot ")
         return
 
     # Assign roles
@@ -428,6 +429,52 @@ async def announce_final_results(chat_id: int, context: CallbackContext):
     await context.bot.send_message(chat_id, text=result_message, parse_mode=ParseMode.MARKDOWN)
     del games[chat_id]
 
+async def leave_game(update: Update, context: CallbackContext) -> None:
+    user = update.message.from_user
+    chat_id = update.message.chat_id
+    game = games.get(chat_id)
+
+    if not game:
+        await update.message.reply_text("No game is currently running in this chat.")
+        return
+
+    if user.id not in game['players']:
+        await update.message.reply_text("You are not a participant in the current game.")
+        return
+
+    # Remove player from the game
+    game['players'].remove(user.id)
+    game['roles'].pop(game['players'].index(user.id))  # Remove the player's role
+
+    # Notify all players about the departure
+    departure_message = f"🚶 *[{user.first_name}](tg://user?id={user.id}) has left the game.* 🚶"
+    await context.bot.send_message(chat_id, text=departure_message, parse_mode=ParseMode.MARKDOWN)
+
+    # Check if only one player is left
+    if len(game['players']) == 1:
+        remaining_player_id = game['players'][0]
+        remaining_player_details = await context.bot.get_chat(remaining_player_id)
+        remaining_player_first_name = remaining_player_details.first_name
+
+        # Notify remaining player and end the game
+        result_message = (
+            f"🚫 *The game has been ended because you are the only player left.* 🚫\n"
+            f"👤 [{remaining_player_first_name}](tg://user?id={remaining_player_id}) is the last player."
+        )
+        await context.bot.send_message(chat_id, text=result_message, parse_mode=ParseMode.MARKDOWN)
+
+        # Clear game data
+        del games[chat_id]
+    else:
+        # Optionally, update remaining players about the new game status
+        status_message = "📋 *Updated Game Status* 📋\n"
+        for player_id in game['players']:
+            player_details = await context.bot.get_chat(player_id)
+            player_first_name = player_details.first_name
+            status_message += f"👤 [{player_first_name}](tg://user?id={player_id})\n"
+        await context.bot.send_message(chat_id, text=status_message, parse_mode=ParseMode.MARKDOWN)
+        
+
 async def main():
     # Initialize the bot application
     application = ApplicationBuilder().token("YOUR_BOT_TOKEN").build()
@@ -440,6 +487,7 @@ async def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("startgame", start_game))
     application.add_handler(CommandHandler("join", join))
+    application.add_handler(CommandHandler("leave", leave_game))
     application.add_handler(CommandHandler("guess", guess))
 
     # Start polling
