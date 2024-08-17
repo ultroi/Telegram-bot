@@ -194,27 +194,30 @@ async def guess(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     else:
         await update.message.reply_text("You are not the Mantri. You cannot make a guess.")
 
-async def end_round(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
-    global current_round
-    await context.bot.send_message(chat_id, text=f"Round {current_round} ended! Current scores:")
-    
-    for player_id in players:
+ async def end_round(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
+    game = games.get(chat_id)
+    if not game:
+        return
+
+    # Send a message with the current round's scores
+    await context.bot.send_message(chat_id, text=f"Round {game['current_round']} ended! Current scores:")
+
+    results = []
+    for player_id in game['players']:
         user = await context.bot.get_chat(player_id)
-        await context.bot.send_message(chat_id, text=f"{user.first_name}: {get_player_score(player_id)} points")
-    
-    if current_round < rounds:
+        score = get_player_score(player_id)
+        results.append(f"{user.first_name}: {score} points")
+
+    # Send the current scores
+    await context.bot.send_message(chat_id, text="\n".join(results))
+
+    # Check if the game should continue or end
+    if game['current_round'] < rounds:
         await start_game(chat_id, context)
     else:
-        await announce_results(context)
-        reset_game()
+        await announce_results(chat_id, context)
+        del games[chat_id]  # Remove the game from the dictionary
         await context.bot.send_message(chat_id, text="The game has been reset. Use /startgame to start a new game.")
-
-async def announce_results(context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat_id = context.job.chat_id if hasattr(context.job, 'chat_id') else context.job.chat_id
-    await context.bot.send_message(chat_id, text="Game over! Final scores:")
-    for player_id in players:
-        user = await context.bot.get_chat(player_id)
-        await context.bot
         
 
 async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
