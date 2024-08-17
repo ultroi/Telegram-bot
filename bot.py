@@ -163,36 +163,74 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         else:
             await update.message.reply_text("Please send me a message in private chat first to interact with the bot.")
 
-async def startgame(update: Update, context: CallbackContext) -> None:
-    chat_id = update.message.chat_id
-    user = update.message.from_user
+# Function to start the game
+async def start_game(chat_id, context):
+    game = games.get(chat_id)
+    
+    if not game:
+        await context.bot.send_message(chat_id, text="No game is currently running in this chat.")
+        return
 
-    # Check if the user has interacted
-    if has_interacted(user.id):
-        if update.message.chat.type != 'private':
+    game['round'] += 1
+    players = game['players']
+    if len(players) < 4:
+        await context.bot.send_message(chat_id, text="Not enough players to start the game.")
+        return
+    
+    # Assign roles
+    roles = ['Raja', 'Mantri', 'Sipahi', 'Chor']
+    random.shuffle(roles)
+    roles_assigned = dict(zip(players, roles))
+    
+    for player_id, role in roles_assigned.items():
+        await context.bot.send_message(player_id, text=f"Your role is: {role}")
+    
+    # Notify the group about the roles
+    await context.bot.send_message(chat_id, text="Roles have been assigned. Check your private messages.")
+
+    # Example scoring mechanism
+    for player_id, role in roles_assigned.items():
+        if role == 'Raja':
+            update_player_score(player_id, get_player_score(player_id) + 1000)
+        elif role == 'Mantri':
+            update_player_score(player_id, get_player_score(player_id) + 500)
+        elif role == 'Sipahi':
+            update_player_score(player_id, get_player_score(player_id) + 100)
+
+    # Move to the next round or end the game
+    if game['round'] < 5:
+        context.job_queue.run_once(start_game, 300, context=chat_id)  # Schedule next round in 5 minutes
+    else:
+        await context.bot.send_message(chat_id, text="Game over!")
+        reset_game(chat_id)
+
+# Command handlers
+async def startgame(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.message.chat_id
+    if update.message.chat.type != 'private':
+        if context.user_data.get('interacted'):
             await update.message.reply_text("Game is starting! Use /join to participate. You have 1.5 minutes to join.")
             context.job_queue.run_once(remind_join, 60, chat_id=chat_id)
             context.job_queue.run_once(check_start_game, 90, chat_id=chat_id)
             start_new_game(chat_id)  # Initialize the game state
         else:
-            await update.message.reply_text("You can only use /startgame in a group chat.")
+            await update.message.reply_text("Please interact with the bot in private chat first.")
     else:
-        await update.message.reply_text("Please interact with the bot in private chat first.")
+        await update.message.reply_text("You can only use /startgame in a group chat.")
 
-async def join(update: Update, context: CallbackContext) -> None:
+async def join(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.message.chat_id
     user = update.message.from_user
-
+    
     if chat_id not in games:
         await update.message.reply_text("No game is currently running in this chat.")
         return
-
+    
     if user.id not in games[chat_id]['players']:
         games[chat_id]['players'].append(user.id)
         update_player_score(user.id, 0)  # Initialize player score in database
-        mark_as_interacted(user.id)  # Mark user as interacted
         await update.message.reply_text(f"{user.first_name} joined the game!")
-
+        
         if len(games[chat_id]['players']) == 4:
             await start_game(chat_id, context)
     else:
@@ -212,9 +250,10 @@ async def check_start_game(context: CallbackContext) -> None:
         reset_game(chat_id)  # Reset the game state
         await context.bot.send_message(chat_id, text="Use /startgame to start a new game.")
     elif game and len(game['players']) == 4:
-        await startgame(chat_id, context)
+        await start_game(chat_id, context)
     else:
         await context.bot.send_message(chat_id, text="Game state error. Please use /startgame to start a new game.")
+        
 
 async def assign_roles(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
     game = games.get(chat_id)
