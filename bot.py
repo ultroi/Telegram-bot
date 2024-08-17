@@ -22,6 +22,11 @@ print(f"Token: {Token}")
 conn = sqlite3.connect('game.db')
 c = conn.cursor()
 
+# Create a cursor object
+cursor = connection.cursor
+# Use the cursor for database operations
+cursor.execute('SELECT + FROMsome_table')
+
 # Create tables if they don't exist
 c.execute('''CREATE TABLE IF NOT EXISTS players (user_id INTEGER PRIMARY KEY, score INTEGER)''')
 c.execute('''CREATE TABLE IF NOT EXISTS games (game_id INTEGER PRIMARY KEY, current_round INTEGER)''')
