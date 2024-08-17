@@ -57,10 +57,13 @@ def reset_database():
         print(f"Error resetting database: {e}")
 
 async def some_function():
-    #code inside the function 
+    # Code inside the function should be indented
+    # For example:
+    print("Hello, world!")
+
 # Dictionary to store game states
 games = {}
-#other function code
+
 
 # Initialize a new game
 def start_new_game(chat_id):
