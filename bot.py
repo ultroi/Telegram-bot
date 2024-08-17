@@ -58,6 +58,15 @@ async def send_message(update: Update, context: CallbackContext):
         parse_mode=ParseMode.HTML  # or ParseMode.MARKDOWN, depending on your needs
     )
 
+
+# Define the callback function for the scheduled job
+async def scheduled_task(context: CallbackContext):
+    chat_id = context.job.context['chat_id']
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text="This is a scheduled message."
+    )
+
 def start_scheduled_job(job_queue: JobQueue, chat_id: int):
     """
     Schedules a task to be executed periodically or at a specific time.
@@ -65,26 +74,10 @@ def start_scheduled_job(job_queue: JobQueue, chat_id: int):
     :param job_queue: The JobQueue instance from the application.
     :param chat_id: The chat ID where the scheduled task will operate.
     """
-    # Define the callback function for the scheduled job
-    async def scheduled_task(context: CallbackContext):
-        # Example task: send a message to the chat
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="This is a scheduled message."
-        )
-    
-    # Schedule the job
     job_queue.run_repeating(
         callback=scheduled_task,
         interval=3600,  # Interval in seconds (e.g., 3600 seconds = 1 hour)
         first=0,  # Start immediately
-        context={'chat_id': chat_id}  # Pass context using a dictionary
-    )
-
-def start_scheduled_job(job_queue: JobQueue, chat_id: int):
-    job_queue.run_once(
-        callback=scheduled_task,
-        when=60,  # Schedule the task to run once after 60 seconds
         context={'chat_id': chat_id}  # Pass context using a dictionary
     )
 
@@ -106,7 +99,7 @@ def mark_as_interacted(user_id):
             c.execute("INSERT OR REPLACE INTO players (user_id, notified) VALUES (?, 1)", (user_id,))
             conn.commit()
     except sqlite3.Error as e:
-        logging.error(f"Database error in mark_as_interacted: {e}")
+        logging.error(f"Database error in mark_as_interacte d: {e}")
 
 def update_player_score(player_id, new_score):
     try:
