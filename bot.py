@@ -364,7 +364,7 @@ def main() -> None:
     # Add command handlers
     application.add_error_handler(error_handler)
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("startgame", startgame))
+    application.add_handler(CommandHandler("startgame", start_game))
     application.add_handler(CommandHandler("join", join))
     application.add_handler(CommandHandler("guess", guess))
     application.add_handler(CommandHandler("help", help_command))
