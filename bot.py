@@ -150,13 +150,45 @@ async def start_game(update: Update, context: CallbackContext) -> None:
     chat_id = update.message.chat_id
     game = games.get(chat_id)
 
-    if game:
-        await context.bot.send_message(chat_id, text="A game is already running in this chat.")
+    if not game:
+        await context.bot.send_message(chat_id, text="No game is currently running in this chat.")
         return
 
-    start_new_game(chat_id)
-    await context.bot.send_message(chat_id, text="Game is starting soon. Please use /join to join the game.")
-    context.job_queue.run_once(check_start_game, 90, context={'chat_id': chat_id})
+    players = game['players']
+    
+    if len(players) < 4:
+        await context.bot.send_message(chat_id, text="Not enough players to start the game. Need at least 4 players.")
+        return
+
+    # Assign roles
+    roles = ['Raja', 'Mantri', 'Sipahi', 'Chor']
+    random.shuffle(roles)
+    roles_assigned = dict(zip(players, roles))
+
+    # Notify players of their roles
+    for player_id, role in roles_assigned.items():
+        await context.bot.send_message(player_id, text=f"Your role is: {role}")
+
+    # Notify the group
+    await context.bot.send_message(chat_id, text="Roles have been assigned. Check your private messages.")
+
+    # Example scoring mechanism
+    for player_id, role in roles_assigned.items():
+        if role == 'Raja':
+            update_player_score(player_id, get_player_score(player_id) + 1000)
+        elif role == 'Mantri':
+            update_player_score(player_id, get_player_score(player_id) + 500)
+            game['mantri_id'] = player_id  # Set Mantri
+        elif role == 'Sipahi':
+            update_player_score(player_id, get_player_score(player_id) + 100)
+
+    # Handle rounds
+    if game['current_round'] < 5:
+        context.job_queue.run_once(check_start_game, 90, context={'chat_id': chat_id, 'update': update})
+    else:
+        await context.bot.send_message(chat_id, text="Game over!")
+        reset_game(chat_id)
+
 
 async def join(update: Update, context: CallbackContext) -> None:
     chat_id = update.message.chat_id
