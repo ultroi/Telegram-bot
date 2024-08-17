@@ -165,6 +165,8 @@ async def assign_roles(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
             update_player_score(player_id, get_player_score(player_id) + 500)
 
 async def guess(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Your code here 
+    pass  # Replace this with actual implementation 
     user = update.message.from_user
     chat_id = update.message.chat_id
     game = games.get(chat_id)
