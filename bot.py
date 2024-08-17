@@ -4,7 +4,7 @@ import os
 import sqlite3
 import logging
 from datetime import datetime, timedelta
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -254,6 +254,8 @@ async def assign_roles(chat_id, context: CallbackContext) -> None:
             game['mantri_id'] = player_id
             update_player_score(player_id, get_player_score(player_id) + 500)
 
+ 
+# Updated guess function to display options in the group
 async def guess(update: Update, context: CallbackContext) -> None:
     user = update.message.from_user
     chat_id = update.message.chat_id
@@ -267,16 +269,34 @@ async def guess(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("Please use /guess <player_name>")
         return
 
-    guessed_player_name = context.args[0]
-    guessed_player_id = next(
-        (player_id for player_id in game['players']
-         if (await context.bot.get_chat(player_id)).first_name == guessed_player_name), 
-        None
+    # List player names and create inline keyboard options
+    player_names = [await (await context.bot.get_chat(player_id)).first_name for player_id in game['players']]
+    keyboard = [[InlineKeyboardButton(name, callback_data=name)] for name in player_names]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await context.bot.send_message(
+        chat_id,
+        text="Guess who is the Chor?",
+        reply_markup=reply_markup
     )
 
-    if guessed_player_id is None:
-        await update.message.reply_text("Invalid guess. Please use /guess <player_name>")
+# Callback function to handle button presses
+async def handle_guess_selection(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    user_id = query.from_user.id
+    chat_id = query.message.chat_id
+    selected_name = query.data
+    game = games.get(chat_id)
+
+    if not game or user_id != game['mantri_id']:
+        await query.answer("You are not the Mantri or the game is not active.")
         return
+
+    guessed_player_id = next(
+        (player_id for player_id in game['players']
+         if (await context.bot.get_chat(player_id)).first_name == selected_name), 
+        None
+    )
 
     actual_chor_id = next(
         (player_id for player_id, role in zip(game['players'], game['roles']) if role == "Chor"), 
@@ -285,12 +305,25 @@ async def guess(update: Update, context: CallbackContext) -> None:
     actual_chor_name = (await context.bot.get_chat(actual_chor_id)).first_name
 
     if guessed_player_id == actual_chor_id:
-        await update.message.reply_text(f"Correct guess! {guessed_player_name} is the Chor.")
+        await query.message.reply_text(f"Correct guess! {selected_name} is the Chor.")
     else:
-        await update.message.reply_text(f"Wrong guess! {guessed_player_name} is not the Chor. {actual_chor_name} is the actual Chor.")
-        update_player_score(user.id, get_player_score(user.id) - 500)
+        await query.message.reply_text(f"Wrong guess! {selected_name} is not the Chor. {actual_chor_name} is the actual Chor.")
+        update_player_score(user_id, get_player_score(user_id) - 500)
 
     await end_round(chat_id, context)
+    await query.answer()  # Acknowledge the callback
+
+# Add handler for callback queries
+if __name__ == '__main__':
+    application = ApplicationBuilder().token(Token).build()
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("startgame", start_game))
+    application.add_handler(CommandHandler("join", join))
+    application.add_handler(CommandHandler("guess", guess))
+    application.add_handler(CallbackQueryHandler(handle_guess_selection))
+
+    application.run_polling()
 
 async def end_round(chat_id, context: CallbackContext) -> None:
     game = games.get(chat_id)
