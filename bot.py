@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 import random
+from functools import partial
 import os
 import asyncio
 import sqlite3
