@@ -22,17 +22,21 @@ print(f"Token: {Token}")
 conn = sqlite3.connect('game.db')
 c = conn.cursor()
 
-# Create a cursor object
-cursor = connection.cursor
-# Use the cursor for database operations
-cursor.execute('SELECT + FROMsome_table')
-
 # Create tables if they don't exist
-c.execute('''CREATE TABLE IF NOT EXISTS players (user_id INTEGER PRIMARY KEY, score INTEGER)''')
-c.execute('''CREATE TABLE IF NOT EXISTS games (game_id INTEGER PRIMARY KEY, current_round INTEGER)''')
+c.execute('''CREATE TABLE IF NOT EXISTS players (user_id INTEGER PRIMARY KEY, score INTEGER, notified INTEGER DEFAULT 0)''')
+c.execute('''CREATE TABLE IF NOT EXISTS games (game_id INT EGER PRIMARY KEY, current_round INTEGER)''')
 
-# Commit changes and close the connection
+# Commit changes
 conn.commit()
+
+# Remove erroneous cursor and connection usage
+# cursor = connection.cursor
+# cursor.execute('SELECT + FROMsome_table')
+# Create tables if they don't exist
+
+async def some_function():
+    # Code inside the function should be indented
+    print("Hello, world!")
 
 # Check if the user has interacted
 def has_interacted(user_id):
@@ -41,9 +45,7 @@ def has_interacted(user_id):
     c.execute("SELECT notified FROM players WHERE user_id=?", (user_id,))
     result = c.fetchone()
     conn.close()
-    if result and result[0] == 1:
-        return True
-    return False
+    return result and result[0] == 1
 
 # Mark user as interacted
 def mark_as_interacted(user_id):
@@ -56,63 +58,41 @@ def mark_as_interacted(user_id):
 # Function to add or update player score
 def update_player_score(user_id, score):
     try:
+        conn = sqlite3.connect('game.db')
+        c = conn.cursor()
         c.execute('INSERT OR REPLACE INTO players (user_id, score) VALUES (?, ?)', (user_id, score))
         conn.commit()
     except sqlite3.Error as e:
         print(f"Error updating player score: {e}")
+    finally:
+        conn.close()
 
 # Function to get player score
 def get_player_score(user_id):
     try:
+        conn = sqlite3.connect('game.db')
+        c = conn.cursor()
         c.execute('SELECT score FROM players WHERE user_id = ?', (user_id,))
         result = c.fetchone()
         return result[0] if result else 0
     except sqlite3.Error as e:
         print(f"Error retrieving player score: {e}")
         return 0
+    finally:
+        conn.close()
 
 # Reset the database
 def reset_database():
     try:
+        conn = sqlite3.connect('game.db')
+        c = conn.cursor()
         c.execute('DELETE FROM players')
         c.execute('DELETE FROM games')
         conn.commit()
     except sqlite3.Error as e:
         print(f"Error resetting database: {e}")
-
-async def some_function():
-    # Code inside the function should be indented
-    print("Hello, world!")
-
-def get_player_data(user_id):
-    conn = sqlite3.connect('game.db')
-    c = conn.cursor()
-    
-    try:
-        c.execute("SELECT * FROM players WHERE user_id=?", (user_id,))
-        player = c.fetchone()
-        if player is None:
-            return None
-        return player
-    except sqlite3.OperationalError as e:
-        print(f"Database error: {e}")
-        return None
     finally:
         conn.close()
-
-def update_player_notified(user_id, notified_status):
-    conn = sqlite3.connect('game.db')
-    c = conn.cursor()
-    
-    try:
-        c.execute("UPDATE players SET notified=? WHERE user_id=?", (notified_status, user_id))
-        conn.commit()
-    except sqlite3.OperationalError as e:
-        print(f"Database error: {e}")
-    finally:
-        conn.close()
-
-
 
 # Dictionary to store game states
 games = {}
