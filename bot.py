@@ -114,7 +114,7 @@ def reset_game(chat_id):
 
 
 # Ensure these are defined globally or within the appropriate context
-conn = sqlite3.connect('database.db')  # Adjust to your database file path
+conn = sqlite3.connect('game.db')  # Adjust to your database file path
 cursor = conn.cursor()
 
 def start(update: Update, context: CallbackContext) -> None:
