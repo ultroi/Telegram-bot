@@ -201,27 +201,29 @@ async def assign_roles(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     await end_round(chat_id, context)
 
-
-
 async def end_round(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # Your code here pass
+    # Retrieve the game state for the given chat_id
     game = games.get(chat_id)
     if not game:
         return
 
+    # Notify the chat that the round has ended
     await context.bot.send_message(chat_id, text=f"Round {game['current_round']} ended! Current scores:")
 
+    # Prepare results to send
     results = []
     for player_id in game['players']:
         user = await context.bot.get_chat(player_id)
         score = get_player_score(player_id)
         results.append(f"{user.first_name}: {score} points")
 
+    # Send the results to the chat
     await context.bot.send_message(chat_id, text="\n".join(results))
 
+    # Check if the game should end or continue
     if game['current_round'] >= 5:
         await announce_results(chat_id, context)
-        del games[chat_id]
+        del games[chat_id]  # Remove game data for this chat
     else:
         await start_game(chat_id, context)
 
