@@ -1,14 +1,16 @@
 from dotenv import load_dotenv
 import random
 import os
+import asyncio
 import sqlite3
 import logging
 from datetime import datetime, timedelta
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     CallbackContext,
+    JobQueue,
     CallbackQueryHandler,
 )
 
@@ -44,6 +46,18 @@ init_db()
 games = {}
 
 
+async def scheduled_task(context: CallbackContext):
+    # Your scheduled task logic here
+    chat_id = context.job.context['chat_id']
+    # Example: Send a message to the chat
+    await context.bot.send_message(chat_id, text="Scheduled task executed!")
+
+def start_scheduled_job(job_queue: JobQueue, chat_id: int):
+    job_queue.run_once(
+        callback=scheduled_task,
+        when=60,  # Schedule the task to run once after 60 seconds
+        context={'chat_id': chat_id}  # Pass context using a dictionary
+    )
 
 def has_interacted(user_id):
     try:
@@ -292,8 +306,6 @@ async def assign_roles(chat_id, context: CallbackContext) -> None:
             game['mantri_id'] = player_id
             update_player_score(player_id, get_player_score(player_id) + 500)
 
- 
-# Updated guess function to display options in the group
 async def guess(update: Update, context: CallbackContext) -> None:
     user = update.message.from_user
     chat_id = update.message.chat_id
@@ -313,7 +325,7 @@ async def guess(update: Update, context: CallbackContext) -> None:
 
     guessed_username = context.args[0]
 
-    # Get player usernames and first names
+    # Get player details
     player_details = {player_id: await context.bot.get_chat(player_id) for player_id in game['players']}
     player_usernames = {player_id: details.username for player_id, details in player_details.items()}
     player_first_names = {player_id: details.first_name for player_id, details in player_details.items()}
@@ -324,7 +336,7 @@ async def guess(update: Update, context: CallbackContext) -> None:
     )
 
     if guessed_player_id is None:
-        await update.message.reply_text("🤦🏼Invalid guess. Please use /guess <username>")
+        await update.message.reply_text("🤦🏼 Invalid guess. Please use /guess <username>")
         return
 
     actual_chor_id = next(
@@ -335,11 +347,11 @@ async def guess(update: Update, context: CallbackContext) -> None:
 
     # Send result to group chat
     if guessed_player_id == actual_chor_id:
-        result_message = f"🎉 *Correct guess!* @{guessed_username} is the Chor. 🎉"
+        result_message = f"🎉 *Correct guess!* [{guessed_username}](tg://user?id={guessed_player_id}) is the Chor. 🎉"
     else:
         result_message = (
-            f"❌ *Wrong guess!* @{guessed_username} is not the Chor.\n"
-            f"👤 @{actual_chor_username} is the actual Chor."
+            f"❌ *Wrong guess!* [{guessed_username}](tg://user?id={guessed_player_id}) is not the Chor.\n"
+            f"👤 [{actual_chor_username}](tg://user?id={actual_chor_id}) is the actual Chor."
         )
         update_player_score(user.id, get_player_score(user.id) - 500)
 
@@ -371,40 +383,44 @@ async def start_next_round(chat_id: int, context: CallbackContext):
     total_rounds = game['total_rounds']
     mantri_id = game['mantri_id']
     mantri_details = await context.bot.get_chat(mantri_id)
-    mantri_username = mantri_details.username
     mantri_first_name = mantri_details.first_name
 
-    round_message = (
+    # Message for the group chat with Mantri's role and players' roles
+    roles_message = (
         f"🏁 *Round {current_round - 1} Ended* 🏁\n"
         f"🚀 *Round {current_round} Started* 🚀\n\n"
-        f"📊 *Game Status* 📊\n"
-        f"📆 Total Rounds: {total_rounds}\n"
-        f"🔄 Ongoing Round: {current_round}\n"
-        f"👥 *Players*:\n"
+        f"{mantri_first_name}, you have 1 minute to guess the Chor! Use /guess <username>\n\n"
+        f"*Players:* \n"
     )
 
     player_details = {player_id: await context.bot.get_chat(player_id) for player_id in game['players']}
-    for player_id in game['players']:
-        player_username = player_details[player_id].username
-        player_first_name = player_details[player_id].first_name
-        player_score = get_player_score(player_id)
-        round_message += f"👤 [{player_first_name}](tg://user?id={player_id}) - {player_score} points\n"
-
-    round_message += f"\n👑 [{mantri_first_name}](tg://user?id={mantri_id}), it's your turn to guess the Chor! Use /guess <username>\n"
-
-    await context.bot.send_message(chat_id, text=round_message, parse_mode=ParseMode.MARKDOWN)
-
-    # Assign roles and notify players privately
     for player_id, role in zip(game['players'], game['roles']):
-        role_message = f"Your role: {role}"
-        await context.bot.send_message(player_id, text=role_message)
+        player_first_name = player_details[player_id].first_name
+        roles_message += f"👤 [{player_first_name}](tg://user?id={player_id}) - {role}\n"
+
+    # Send roles message to the group chat
+    await context.bot.send_message(chat_id, text=roles_message, parse_mode=ParseMode.MARKDOWN)
+
+    # Notify all players privately about their roles
+    for player_id, role in zip(game['players'], game['roles']):
+        if player_id != mantri_id:
+            role_message = f"Your role: {role}"
+            await context.bot.send_message(player_id, text=role_message)
+
+    # Set a 1-minute timer for the Mantri to make a guess
+    await asyncio.sleep(60)  # 1 minute delay
+
+    # Check if the Mantri has made a guess
+    if game['current_round'] == current_round:
+        # End the game if the Mantri did not guess
+        await context.bot.send_message(chat_id, text=f"⏳ Time is up! {mantri_first_name} did not make a guess. The game is over.", parse_mode=ParseMode.MARKDOWN)
+        await announce_final_results(chat_id, context)
 
 async def announce_final_results(chat_id: int, context: CallbackContext):
     game = games[chat_id]
     result_message = "🏆 *Final Results* 🏆\n"
     player_details = {player_id: await context.bot.get_chat(player_id) for player_id in game['players']}
     for player_id in game['players']:
-        player_username = player_details[player_id].username
         player_first_name = player_details[player_id].first_name
         player_score = get_player_score(player_id)
         result_message += f"👤 [{player_first_name}](tg://user?id={player_id}) - {player_score} points\n"
@@ -412,60 +428,35 @@ async def announce_final_results(chat_id: int, context: CallbackContext):
     await context.bot.send_message(chat_id, text=result_message, parse_mode=ParseMode.MARKDOWN)
     del games[chat_id]
 
+async def main():
+    # Initialize the bot application
+    application = ApplicationBuilder().token("YOUR_BOT_TOKEN").build()
+    job_queue = application.job_queue
 
-# Callback function to handle button presses
-async def handle_guess_selection(update: Update, context: CallbackContext) -> None:
-    query = update.callback_query
-    user_id = query.from_user.id
-    chat_id = query.message.chat_id
-    selected_name = query.data
-    game = games.get(chat_id)
+    # Schedule the task
+    start_scheduled_job(job_queue, chat_id=123456789)
 
-    if not game or user_id != game['mantri_id']:
-        await query.answer("You are not the Mantri or the game is not active.")
-        return
-
-    guessed_player_id = next(
-        (player_id for player_id in game['players']
-         if (await context.bot.get_chat(player_id)).first_name == selected_name), 
-        None
-    )
-
-    actual_chor_id = next(
-        (player_id for player_id, role in zip(game['players'], game['roles']) if role == "Chor"), 
-        None
-    )
-    actual_chor_name = (await context.bot.get_chat(actual_chor_id)).first_name
-
-    if guessed_player_id == actual_chor_id:
-        await query.message.reply_text(f"Correct guess! {selected_name} is the Chor.")
-    else:
-        await query.message.reply_text(f"Wrong guess! {selected_name} is not the Chor. {actual_chor_name} is the actual Chor.")
-        update_player_score(user_id, get_player_score(user_id) - 500)
-
-    await end_round(chat_id, context)
-    await query.answer()  # Acknowledge the callback
-
-# Add handler for callback queries
-if __name__ == '__main__':
-    application = ApplicationBuilder().token(Token).build()
-
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("startgame", start_game))
-    application.add_handler(CommandHandler("join", join))
-    application.add_handler(CommandHandler("guess", guess))
-    application.add_handler(CallbackQueryHandler(handle_guess_selection))
-
-    application.run_polling()
-
-# Main function to run the bot
-if __name__ == '__main__':
-    application = ApplicationBuilder().token(Token).build()
-
+    # Add command handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("startgame", start_game))
     application.add_handler(CommandHandler("join", join))
     application.add_handler(CommandHandler("guess", guess))
 
-    application.run_polling()
-    
+    # Start polling
+    await application.run_polling()
+
+async def shutdown(application):
+    # Stop the application gracefully
+    await application.stop()
+    await application.wait_closed()
+
+if __name__ == '__main__':
+    # Run the bot application with proper shutdown handling
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        # Handle graceful shutdown on exit
+        print("Stopping bot...")
+        asyncio.run(shutdown(application))
+
+
