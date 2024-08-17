@@ -24,7 +24,7 @@ c = conn.cursor()
 
 # Create tables if they don't exist
 c.execute('''CREATE TABLE IF NOT EXISTS players (user_id INTEGER PRIMARY KEY, score INTEGER, notified INTEGER DEFAULT 0)''')
-c.execute('''CREATE TABLE IF NOT EXISTS games (game_id INT EGER PRIMARY KEY, current_round INTEGER)''')
+c.execute('''CREATE TABLE IF NOT EXISTS games (game_id INTEGER PRIMARY KEY, current_round INTEGER)''')
 
 # Commit changes
 conn.commit()
