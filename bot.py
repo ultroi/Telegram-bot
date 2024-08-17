@@ -61,7 +61,7 @@ async def send_message(update: Update, context: CallbackContext):
 
 
 def callback(context: CallbackContext):
-    chat_id = context.job.context
+    chat_id = context.job.context['chat_id']
     # Your logic here
 
 def start_scheduled_job(job_queue: JobQueue, chat_id: int):
@@ -69,7 +69,7 @@ def start_scheduled_job(job_queue: JobQueue, chat_id: int):
         callback,  # Your callback function
         interval=60,  # Interval in seconds
         first=0,  # Start immediately
-        context=chat_id  # set context here
+        context={'chat_id': chat_id}  # Set context as a dictionary
     )
 
  
