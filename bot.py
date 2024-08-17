@@ -45,7 +45,12 @@ init_db()
 # Dictionary to store game states
 games = {}
 
+# Define constants manually if ParseMode is not available
+MARKDOWN = 'Markdown'
+HTML = 'HTML'
 
+# Usage in send_message
+await context.bot.send_message(chat_id, text=result_message, parse_mode=MARKDOWN)
 async def scheduled_task(context: CallbackContext):
     # Your scheduled task logic here
     chat_id = context.job.context['chat_id']
