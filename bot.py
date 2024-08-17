@@ -201,6 +201,44 @@ async def guess(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         update_player_score(user.id, get_player_score(user.id) - 500)
 
     await end_round(chat_id, context)
+async def guess(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.message.from_user
+    chat_id = update.message.chat_id
+    game = games.get(chat_id)
+
+    if not game or user.id != game['mantri_id']:
+        await update.message.reply_text("You are not the Mantri or the game is not active.")
+        return
+
+    if not context.args:
+        await update.message.reply_text("Please use /guess <player_name>")
+        return
+
+    guessed_player_name = context.args[0]
+    guessed_player_id = next(
+        (player_id for player_id in game['players']
+         if (await context.bot.get_chat(player_id)).first_name == guessed_player_name), 
+        None
+    )
+
+    if guessed_player_id is None:
+        await update.message.reply_text("Invalid guess. Please use /guess <player_name>")
+        return
+
+    actual_chor_id = next(
+        (player_id for player_id, role in zip(game['players'], game['roles']) if role == "Chor"), 
+        None
+    )
+    actual_chor_name = (await context.bot.get_chat(actual_chor_id)).first_name
+
+    if guessed_player_id == actual_chor_id:
+        await update.message.reply_text(f"Correct guess! {guessed_player_name} is the Chor.")
+    else:
+        await update.message.reply_text(f"Wrong guess! {guessed_player_name} is not the Chor. {actual_chor_name} is the actual Chor.")
+        update_player_score(user.id, get_player_score(user.id) - 500)
+
+    await end_round(chat_id, context)
+
 
 async def end_round(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Retrieve the game state for the given chat_id
