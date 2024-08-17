@@ -170,8 +170,7 @@ async def assign_roles(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
             game['mantri_id'] = player_id
             update_player_score(player_id, get_player_score(player_id) + 500)
 
-
- async def guess(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def guess(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.message.chat_id
     user = update.message.from_user
     game = games.get(chat_id)
