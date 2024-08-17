@@ -267,11 +267,17 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if query.data == 'start_game':
         await query.message.reply_text("Use /startgame in a group chat to begin the game.")
 
+async def error_handler(update: Update, context: CallbackContext) -> None:
+    print(f"Update {update} caused error {context.error}")
+
+
+
 def main() -> None:
     # Initialize the application
     application = ApplicationBuilder().token(Token).build()
 
     # Add command handlers
+    application.add_error_handler(error_handler)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("startgame", startgame))
     application.add_handler(CommandHandler("join", join))
