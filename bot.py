@@ -127,6 +127,7 @@ def start(update: Update, context: CallbackContext) -> None:
         result = cursor.fetchone()
 
         if result and result[0] == 1:
+            await
             update.message.reply_text(f"Hello again, {user_first_name}! You've already interacted with me. How can I assist you today?")
         else:
             # If not, mark as interacted and send welcome message
@@ -143,9 +144,11 @@ def start(update: Update, context: CallbackContext) -> None:
                 "/help - Show this help message\n\n"
                 "Feel free to explore and let me know how I can help you today!"
             )
+            await
             update.message.reply_text(welcome_message)
     except sqlite3.Error as e:
         print(f"Database error: {e}")
+        await
         update.message.reply_text("An error occurred while accessing the database. Please try again later.")
         
 
