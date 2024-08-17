@@ -133,6 +133,19 @@ async def start(update: Update, context: CallbackContext) -> None:
         logging.error(f"Database error: {e}")
         await update.message.reply_text("An error occurred while accessing the database. Please try again later.")
 
+async def check_start_game(context: CallbackContext) -> None:
+    chat_id = context.job.context['chat_id']
+    game = games.get(chat_id)
+    
+    if game and len(game['players']) < 4:
+        await context.bot.send_message(chat_id, text="Not enough players joined. The game is ending.")
+        reset_game(chat_id)
+        await context.bot.send_message(chat_id, text="Use /startgame to start a new game.")
+    elif game and len(game['players']) == 4:
+        await start_game(context.job.context['update'], context)
+    else:
+        await context.bot.send_message(chat_id, text="Game state error. Please use /startgame to start a new game.")
+
 async def start_game(update: Update, context: CallbackContext) -> None:
     chat_id = update.message.chat_id
     game = games.get(chat_id)
