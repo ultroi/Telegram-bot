@@ -59,10 +59,9 @@ async def send_message(update: Update, context: CallbackContext):
         parse_mode=ParseMode.HTML  # or ParseMode.MARKDOWN, depending on your needs
     )
 
-# Define the callback function for the scheduled job
 async def scheduled_task(context: CallbackContext):
     chat_id = context.job.context['chat_id']
-    context.bot.send_message(
+    await context.bot.send_message(
         chat_id=chat_id,
         text="This is a scheduled message."
     )
