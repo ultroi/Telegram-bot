@@ -308,56 +308,109 @@ async def guess(update: Update, context: CallbackContext) -> None:
         return
 
     if not context.args:
-        await update.message.reply_text("Please use /guess <player_name>")
+        await update.message.reply_text("Please use /guess <username>")
         return
 
-    guessed_player_name = context.args[0]
+    guessed_username = context.args[0]
 
-    # Get player names and roles
-    player_names = {player_id: (await context.bot.get_chat(player_id)).first_name for player_id in game['players']}
-    player_roles = {player_id: role for player_id, role in zip(game['players'], game['roles'])}
+    # Get player usernames and first names
+    player_details = {player_id: await context.bot.get_chat(player_id) for player_id in game['players']}
+    player_usernames = {player_id: details.username for player_id, details in player_details.items()}
+    player_first_names = {player_id: details.first_name for player_id, details in player_details.items()}
+
     guessed_player_id = next(
-        (player_id for player_id, name in player_names.items() if name == guessed_player_name), 
+        (player_id for player_id, username in player_usernames.items() if username == guessed_username), 
         None
     )
 
     if guessed_player_id is None:
-        await update.message.reply_text("Invalid guess. Please use /guess <player_name>")
+        await update.message.reply_text("🤦🏼Invalid guess. Please use /guess <username>")
         return
 
     actual_chor_id = next(
-        (player_id for player_id, role in player_roles.items() if role == "Chor"), 
+        (player_id for player_id, role in zip(game['players'], game['roles']) if role == "Chor"), 
         None
     )
-    actual_chor_name = player_names[actual_chor_id]
+    actual_chor_username = player_usernames[actual_chor_id]
 
     # Send result to group chat
     if guessed_player_id == actual_chor_id:
-        result_message = f"Correct guess! {guessed_player_name} is the Chor."
+        result_message = f"🎉 *Correct guess!* @{guessed_username} is the Chor. 🎉"
     else:
-        result_message = f"Wrong guess! {guessed_player_name} is not the Chor. {actual_chor_name} is the actual Chor."
+        result_message = (
+            f"❌ *Wrong guess!* @{guessed_username} is not the Chor.\n"
+            f"👤 @{actual_chor_username} is the actual Chor."
+        )
+        update_player_score(user.id, get_player_score(user.id) - 500)
 
-    # Reveal all players' identities and roles in the group chat
-    all_player_info = "\n".join(
-        [f"{player_names[player_id]}: {player_roles[player_id]}" for player_id in game['players']]
-    )
-    result_message += f"\n\nHere are the roles of all players:\n{all_player_info}"
-    
-    await context.bot.send_message(chat_id, text=result_message)
+    await context.bot.send_message(chat_id, text=result_message, parse_mode=ParseMode.MARKDOWN)
 
-    # Send roles privately to the Mantri
-    mantri_roles = "\n".join(
-        [f"{player_names[player_id]}: {player_roles[player_id]}" for player_id in game['players']]
-    )
-    await context.bot.send_message(game['mantri_id'], text=f"Roles of all players:\n{mantri_roles}")
+    # Reveal all players' roles
+    roles_message = "🕵️ *Player Roles* 🕵️\n"
+    for player_id, role in zip(game['players'], game['roles']):
+        roles_message += f"👤 [{player_first_names[player_id]}](tg://user?id={player_id}) - {role}\n"
 
-    # Show scoreboard
-    scores = "\n".join(
-        [f"{(await context.bot.get_chat(player_id)).first_name}: {get_player_score(player_id)}" for player_id in game['players']]
-    )
-    await context.bot.send_message(chat_id, text=f"Scoreboard:\n{scores}")
+    await context.bot.send_message(chat_id, text=roles_message, parse_mode=ParseMode.MARKDOWN)
 
     await end_round(chat_id, context)
+
+async def end_round(chat_id: int, context: CallbackContext) -> None:
+    game = games.get(chat_id)
+    if not game:
+        return
+
+    game['current_round'] += 1
+    if game['current_round'] > game['total_rounds']:
+        await announce_final_results(chat_id, context)
+    else:
+        await start_next_round(chat_id, context)
+
+async def start_next_round(chat_id: int, context: CallbackContext):
+    game = games[chat_id]
+    current_round = game['current_round']
+    total_rounds = game['total_rounds']
+    mantri_id = game['mantri_id']
+    mantri_details = await context.bot.get_chat(mantri_id)
+    mantri_username = mantri_details.username
+    mantri_first_name = mantri_details.first_name
+
+    round_message = (
+        f"🏁 *Round {current_round - 1} Ended* 🏁\n"
+        f"🚀 *Round {current_round} Started* 🚀\n\n"
+        f"📊 *Game Status* 📊\n"
+        f"📆 Total Rounds: {total_rounds}\n"
+        f"🔄 Ongoing Round: {current_round}\n"
+        f"👥 *Players*:\n"
+    )
+
+    player_details = {player_id: await context.bot.get_chat(player_id) for player_id in game['players']}
+    for player_id in game['players']:
+        player_username = player_details[player_id].username
+        player_first_name = player_details[player_id].first_name
+        player_score = get_player_score(player_id)
+        round_message += f"👤 [{player_first_name}](tg://user?id={player_id}) - {player_score} points\n"
+
+    round_message += f"\n👑 [{mantri_first_name}](tg://user?id={mantri_id}), it's your turn to guess the Chor! Use /guess <username>\n"
+
+    await context.bot.send_message(chat_id, text=round_message, parse_mode=ParseMode.MARKDOWN)
+
+    # Assign roles and notify players privately
+    for player_id, role in zip(game['players'], game['roles']):
+        role_message = f"Your role: {role}"
+        await context.bot.send_message(player_id, text=role_message)
+
+async def announce_final_results(chat_id: int, context: CallbackContext):
+    game = games[chat_id]
+    result_message = "🏆 *Final Results* 🏆\n"
+    player_details = {player_id: await context.bot.get_chat(player_id) for player_id in game['players']}
+    for player_id in game['players']:
+        player_username = player_details[player_id].username
+        player_first_name = player_details[player_id].first_name
+        player_score = get_player_score(player_id)
+        result_message += f"👤 [{player_first_name}](tg://user?id={player_id}) - {player_score} points\n"
+
+    await context.bot.send_message(chat_id, text=result_message, parse_mode=ParseMode.MARKDOWN)
+    del games[chat_id]
 
 
 # Callback function to handle button presses
