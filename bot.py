@@ -1,6 +1,10 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from dotenv import load_dotenv
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackContext
 import random
+
+load_dotenv()
+Token = os.getenv("BOT_TOKEN")
 
 # Define global variables
 players = []
@@ -139,7 +143,7 @@ def reset_game() -> None:
     mantri_id = None
 
 def main() -> None:
-    application = Application.builder().token("7528641996:AAFSMNIVRBLotZUcwepXAw_qQsiU5oGUG-0").build()
+    application = Application.builder().token().build()
     
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("startgame", startgame))
