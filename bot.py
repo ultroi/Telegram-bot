@@ -60,6 +60,36 @@ async def some_function():
     # Code inside the function should be indented
     print("Hello, world!")
 
+def get_player_data(user_id):
+    conn = sqlite3.connect('game.db')
+    c = conn.cursor()
+    
+    try:
+        c.execute("SELECT * FROM players WHERE user_id=?", (user_id,))
+        player = c.fetchone()
+        if player is None:
+            return None
+        return player
+    except sqlite3.OperationalError as e:
+        print(f"Database error: {e}")
+        return None
+    finally:
+        conn.close()
+
+def update_player_notified(user_id, notified_status):
+    conn = sqlite3.connect('game.db')
+    c = conn.cursor()
+    
+    try:
+        c.execute("UPDATE players SET notified=? WHERE user_id=?", (notified_status, user_id))
+        conn.commit()
+    except sqlite3.OperationalError as e:
+        print(f"Database error: {e}")
+    finally:
+        conn.close()
+
+
+
 # Dictionary to store game states
 games = {}
 
