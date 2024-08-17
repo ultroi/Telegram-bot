@@ -56,30 +56,6 @@ def mark_as_interacted(user_id):
     conn.close()
 
 # Function to add or update player score
-def update_player_score(user_id, score):
-    try:
-        conn = sqlite3.connect('game.db')
-        c = conn.cursor()
-        c.execute('INSERT OR REPLACE INTO players (user_id, score) VALUES (?, ?)', (user_id, score))
-        conn.commit()
-    except sqlite3.Error as e:
-        print(f"Error updating player score: {e}")
-    finally:
-        conn.close()
-
-# Function to get player score
-def get_player_score(user_id):
-    try:
-        conn = sqlite3.connect('game.db')
-        c = conn.cursor()
-        c.execute('SELECT score FROM players WHERE user_id = ?', (user_id,))
-        result = c.fetchone()
-        return result[0] if result else 0
-    except sqlite3.Error as e:
-        print(f"Error retrieving player score: {e}")
-        return 0
-    finally:
-        conn.close()
 
 # Reset the database
 def reset_database():
@@ -149,10 +125,13 @@ async def start(update: Update, context: CallbackContext) -> None:
     except sqlite3.Error as e:
         print(f"Database error: {e}")
         await update.message.reply_text("An error occurred while accessing the database. Please try again later.")
-        
 
-# Function to start the game
-async def start_game(chat_id, context):
+
+# Example in-memory storage
+games = {}
+
+async def start_game(update: Update, context: CallbackContext) -> None:
+    chat_id = update.message.chat_id
     game = games.get(chat_id)
 
     if not game:
@@ -161,6 +140,7 @@ async def start_game(chat_id, context):
 
     game['current_round'] += 1
     players = game['players']
+    
     if len(players) < 4:
         await context.bot.send_message(chat_id, text="Not enough players to start the game.")
         return
@@ -170,10 +150,11 @@ async def start_game(chat_id, context):
     random.shuffle(roles)
     roles_assigned = dict(zip(players, roles))
 
+    # Notify players of their roles
     for player_id, role in roles_assigned.items():
         await context.bot.send_message(player_id, text=f"Your role is: {role}")
 
-    # Notify the group about the roles
+    # Notify the group
     await context.bot.send_message(chat_id, text="Roles have been assigned. Check your private messages.")
 
     # Example scoring mechanism
@@ -187,10 +168,23 @@ async def start_game(chat_id, context):
 
     # Move to the next round or end the game
     if game['current_round'] < 5:
-        context.job_queue.run_once(start_game, 300, context=chat_id)  # Schedule next round in 5 minutes
+        # Schedule the next round in 5 minutes
+        context.job_queue.run_once(lambda context: start_game(update, context), 300, context={'chat_id': chat_id})
     else:
         await context.bot.send_message(chat_id, text="Game over!")
         reset_game(chat_id)
+
+def update_player_score(player_id, new_score):
+    # Implement this function to update player score in your database
+    pass
+
+def get_player_score(player_id):
+    # Implement this function to get the player's score from your database
+    pass
+
+def reset_game(chat_id):
+    # Implement this function to reset the game state for the chat
+    pass
 
 async def guess(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.message.from_user
