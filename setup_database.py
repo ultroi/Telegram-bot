@@ -8,6 +8,7 @@ c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS players (
     user_id INTEGER PRIMARY KEY,
     score INTEGER
+    notified BOOLEAN DEFAULT
 )''')
 
 c.execute('''CREATE TABLE IF NOT EXISTS games (
