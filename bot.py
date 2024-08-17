@@ -46,6 +46,10 @@ init_db()
 games = {}
 
 # Define constants manually if ParseMode is not available
+MARKDOWN = 'Markdown'
+HTML = 'HTML'
+
+# Define the async send_message function 
 async def send_message(update: Update, context: CallbackContext):
     result_message = "Your message here"
     await context.bot.send_message(
