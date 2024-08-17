@@ -112,32 +112,42 @@ def reset_game(chat_id):
         del games[chat_id]
     reset_database()  # Ensure this function properly clears the database tables
 
+
+# Ensure these are defined globally or within the appropriate context
+conn = sqlite3.connect('database.db')  # Adjust to your database file path
+cursor = conn.cursor()
+
 def start(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
     user_first_name = update.message.from_user.first_name
 
-    # Check if the user has already interacted
-    cursor.execute('SELECT interacted FROM user_interactions WHERE user_id = ?', (user_id,))
-    result = cursor.fetchone()
+    try:
+        # Check if the user has already interacted
+        cursor.execute('SELECT interacted FROM user_interactions WHERE user_id = ?', (user_id,))
+        result = cursor.fetchone()
 
-    if result and result[0] == 1:
-        update.message.reply_text(f"Hello again, {user_first_name}! You've already interacted with me. How can I assist you today?")
-    else:
-        # If not, mark as interacted and send welcome message
-        cursor.execute('REPLACE INTO user_interactions (user_id, interacted) VALUES (?, 1)', (user_id,))
-        conn.commit()
-        welcome_message = (
-            f"Welcome, {user_first_name}! 🤖\n\n"
-            "I am your friendly neighborhood bot here to assist you with various tasks and games. "
-            "You can start by using the following commands:\n\n"
-            "/startgame - Start a new game in a group chat\n"
-            "/join - Join an ongoing game\n"
-            "/guess <player_name> - Mantri guesses the Chor\n"
-            "/help - Show this help message\n\n"
-            "Feel free to explore and let me know how I can help you today!"
-        )
-        update.message.reply_text(welcome_message)
+        if result and result[0] == 1:
+            update.message.reply_text(f"Hello again, {user_first_name}! You've already interacted with me. How can I assist you today?")
+        else:
+            # If not, mark as interacted and send welcome message
+            cursor.execute('REPLACE INTO user_interactions (user_id, interacted) VALUES (?, 1)', (user_id,))
+            conn.commit()
 
+            welcome_message = (
+                f"Welcome, {user_first_name}! 🤖\n\n"
+                "I am your friendly neighborhood bot here to assist you with various tasks and games. "
+                "You can start by using the following commands:\n\n"
+                "/startgame - Start a new game in a group chat\n"
+                "/join - Join an ongoing game\n"
+                "/guess <player_name> - Mantri guesses the Chor\n"
+                "/help - Show this help message\n\n"
+                "Feel free to explore and let me know how I can help you today!"
+            )
+            update.message.reply_text(welcome_message)
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+        update.message.reply_text("An error occurred while accessing the database. Please try again later.")
+        
 
 # Function to start the game
 async def start_game(chat_id, context):
