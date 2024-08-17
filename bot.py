@@ -69,7 +69,7 @@ def start_scheduled_job(job_queue: JobQueue, chat_id: int):
         callback,  # Your callback function
         interval=60,  # Interval in seconds
         first=0,  # Start immediately
-        context=chat_id  # Pass context if needed
+        context=chat_id  # set context here
     )
 
  
