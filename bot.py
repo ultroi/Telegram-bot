@@ -46,16 +46,14 @@ init_db()
 games = {}
 
 # Define constants manually if ParseMode is not available
-MARKDOWN = 'Markdown'
-HTML = 'HTML'
+async def send_message(update: Update, context: CallbackContext):
+    result_message = "Your message here"
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=result_message,
+        parse_mode=ParseMode.HTML  # or ParseMode.MARKDOWN, depending on your needs
+    )
 
-# Usage in send_message
-await context.bot.send_message(chat_id, text=result_message, parse_mode=MARKDOWN)
-async def scheduled_task(context: CallbackContext):
-    # Your scheduled task logic here
-    chat_id = context.job.context['chat_id']
-    # Example: Send a message to the chat
-    await context.bot.send_message(chat_id, text="Scheduled task executed!")
 
 def start_scheduled_job(job_queue: JobQueue, chat_id: int):
     job_queue.run_once(
@@ -492,6 +490,7 @@ async def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("startgame", start_game))
     application.add_handler(CommandHandler("join", join))
+    application.add_handker(CommandHandler('some_command',handle_command))
     application.add_handler(CommandHandler("leave", leave_game))
     application.add_handler(CommandHandler("guess", guess))
 
