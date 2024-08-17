@@ -15,11 +15,8 @@ if not Token:
     raise ValueError("No token found. Please check your .env file.")
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, ContextTypes, CallbackContext
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackContext
 import random
-
-load_dotenv()
-Token = os.getenv("BOT_TOKEN")
 
 # Define global variables
 players = []
@@ -63,7 +60,7 @@ async def join(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         players.append(user.id)
         await update.message.reply_text(f"{user.first_name} joined the game!")
         if len(players) == 4:
-            await start_game(context.job.chat_id, context)
+            await start_game(update.message.chat_id, context)
 
 async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.message.from_user
@@ -123,13 +120,12 @@ async def guess(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         except (IndexError, StopIteration):
             await update.message.reply_text("Invalid guess. Please use /guess <player_name>")
         finally:
-            await end_round(context)
+            await end_round(update.message.chat_id, context)
     else:
         await update.message.reply_text("You are not the Mantri. You cannot make a guess.")
 
-async def end_round(context: ContextTypes.DEFAULT_TYPE) -> None:
+async def end_round(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
     global current_round
-    chat_id = context.job.chat_id
     await context.bot.send_message(chat_id, text=f"Round {current_round} ended! Current scores:")
     for player_id in players:
         user = await context.bot.get_chat(player_id)
@@ -158,7 +154,7 @@ def reset_game() -> None:
     mantri_id = None
 
 def main() -> None:
-    application = Application.builder().token(Token).build()
+    application = ApplicationBuilder().token(Token).build()
     
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("startgame", startgame))
