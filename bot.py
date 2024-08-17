@@ -60,17 +60,11 @@ async def send_message(update: Update, context: CallbackContext):
     )
 
 
-def callback(context: CallbackContext):
-    chat_id = context.job.context['chat_id']
-    # Your logic here
 
-def start_scheduled_job(job_queue: JobQueue, chat_id: int):
-    job_queue.run_repeating(
-        callback,  # Your callback function
-        interval=60,  # Interval in seconds
-        first=0,  # Start immediately
-        context={'chat_id': chat_id}  # Set context as a dictionary
-    )
+async def periodic_task(chat_id: int, bot):
+    while True:
+        await bot.send_message(chat_id, "This is a periodic message.")
+        await asyncio.sleep(60)  # Sleep for 60 seconds
 
  
 def has_interacted(user_id):
@@ -490,36 +484,26 @@ async def leave_game(update: Update, context: CallbackContext) -> None:
         
 
 async def main():
-    # Initialize the bot application
-    application = ApplicationBuilder().token("YOUR_BOT_TOKEN").build()
+    application = ApplicationBuilder().token(Token).build()
     job_queue = application.job_queue
 
-    # Schedule the task
-    start_scheduled_job(job_queue, chat_id=123456789)
+    chat_id = 123456789  # Replace with your chat ID
+    asyncio.create_task(periodic_task(chat_id, application.bot))
 
-    # Add command handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("startgame", start_game))
     application.add_handler(CommandHandler("join", join))
-    application.add_handker(CommandHandler('some_command',handle_command))
     application.add_handler(CommandHandler("leave", leave_game))
     application.add_handler(CommandHandler("guess", guess))
 
-    # Start polling
     await application.run_polling()
 
 async def shutdown(application):
-    # Stop the application gracefully
     await application.stop()
     await application.wait_closed()
 
-if __name__ == '__main__':
-    # Run the bot application with proper shutdown handling
+if __name__ == "__main__":
     try:
         asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        # Handle graceful shutdown on exit
-        print("Stopping bot...")
-        asyncio.run(shutdown(application))
-
-
+    except KeyboardInterrupt:
+        logging.info("Bot stopped by user.")
