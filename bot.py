@@ -80,18 +80,34 @@ def reset_game(chat_id):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.message.from_user
+    chat_id = update.message.chat_id
+    
+    # Check if the interaction flag is set
+    c.execute('SELECT notified FROM players WHERE user_id = ?', (user.id,))
+    result = c.fetchone()
+    
+    if result:
+        notified = result[0]
+    else:
+        notified = 0
+    
     if update.message.chat.type == 'private':
-        keyboard = [[InlineKeyboardButton("Start Game", callback_data='start_game')]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(
-            f"Hello {user.first_name}, welcome to the game Raja Chor Sipahi Mantri!\n"
-            "In this game, there are 4 roles: Raja, Chor, Sipahi, and Mantri. Each round, the roles are randomly assigned, and Mantri has to guess who the Chor is. Points are awarded based on the roles:\n"
-            "Raja: 1000 points\nChor: 0 points\nSipahi: 100 points\nMantri: 500 points (or 0 if guess is wrong)\n"
-            "The game has 5 rounds, and the player with the highest points at the end wins.\n"
-            "Use /startgame in a group chat to begin the game.",
-            reply_markup=reply_markup
-        )
-        context.user_data['interacted'] = True
+        if not notified:
+            keyboard = [[InlineKeyboardButton("Start Game", callback_data='start_game')]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(
+                f"Hello {user.first_name}, welcome to the game Raja Chor Sipahi Mantri!\n"
+                "In this game, there are 4 roles: Raja, Chor, Sipahi, and Mantri. Each round, the roles are randomly assigned, and Mantri has to guess who the Chor is. Points are awarded based on the roles:\n"
+                "Raja: 1000 points\nChor: 0 points\nSipahi: 100 points\nMantri: 500 points (or 0 if guess is wrong)\n"
+                "The game has 5 rounds, and the player with the highest points at the end wins.\n"
+                "Use /startgame in a group chat to begin the game.",
+                reply_markup=reply_markup
+            )
+            # Update the user as interacted
+            c.execute('INSERT OR REPLACE INTO players (user_id, score, notified) VALUES (?, ?, ?)', (user.id, get_player_score(user.id), 1))
+            conn.commit()
+        else:
+            await update.message.reply_text("You have already interacted with the bot.")
     else:
         if context.user_data.get('interacted'):
             await update.message.reply_text("Use /startgame to begin the game.")
@@ -122,6 +138,9 @@ async def join(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if user.id not in games[chat_id]['players']:
         games[chat_id]['players'].append(user.id)
         update_player_score(user.id, 0)  # Initialize player score in database
+        # Ensure user is marked as notified
+        c.execute('INSERT OR REPLACE INTO players (user_id, score, notified) VALUES (?, ?, ?)', (user.id, get_player_score(user.id), 1))
+        conn.commit()
         await update.message.reply_text(f"{user.first_name} joined the game!")
         
         if len(games[chat_id]['players']) == 4:
