@@ -99,23 +99,37 @@ async def remind_join(context: CallbackContext) -> None:
     await context.bot.send_message(context.job.chat_id, text="30 seconds left to join the game! Use /join to participate.")
 
 async def join(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.message.chat_id
     user = update.message.from_user
-    if user.id not in players and context.user_data.get('interacted'):
-        players.append(user.id)
+    
+    if chat_id not in games:
+        await update.message.reply_text("No game is currently running in this chat.")
+        return
+    
+    if user.id not in games[chat_id]['players']:
+        games[chat_id]['players'].append(user.id)
         update_player_score(user.id, 0)  # Initialize player score in database
         await update.message.reply_text(f"{user.first_name} joined the game!")
-        if len(players) == 4:
-            await start_game(update.message.chat_id, context)
+        
+        if len(games[chat_id]['players']) == 4:
+            await start_game(chat_id, context)
+    else:
+        await update.message.reply_text("You are already in the game.")
 
-async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user = update.message.from_user
-    if user.id in players:
-        players.remove(user.id)
-        update_player_score(user.id, 0)  # Remove player score from database
-        await update.message.reply_text(f"{user.first_name} left the game. The game is ending.")
-        await announce_results(context)
-        reset_game()
-        await update.message.reply_text("The game has been reset. Use /startgame to start a new game.")
+async def start_game(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
+    game = games.get(chat_id)
+    if not game:
+        return
+
+    game['current_round'] += 1
+    if game['current_round'] > rounds:
+        await announce_results(chat_id, context)
+        del games[chat_id]  # Remove the game from the dictionary
+        return
+
+    await context.bot.send_message(chat_id, text=f"Round {game['current_round']} is starting!")
+    await assign_roles(chat_id, context)
+    await context.bot.send_message(chat_id, text="Mantri, please guess who the Chor is by using /guess <player_name>")
 
 async def check_start_game(context: CallbackContext) -> None:
     if len(players) < 4:
@@ -124,35 +138,6 @@ async def check_start_game(context: CallbackContext) -> None:
     else:
         await start_game(context.job.chat_id, context)
 
-async def start_game(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
-    global current_round, mantri_id
-    current_round += 1
-    if current_round > rounds:
-        await announce_results(context)
-        reset_game()
-        return
-
-    await context.bot.send_message(chat_id, text=f"Round {current_round} is starting!")
-    await assign_roles(context)
-    await context.bot.send_message(chat_id, text="Mantri, please guess who the Chor is by using /guess <player_name>")
-
-async def assign_roles(context: ContextTypes.DEFAULT_TYPE) -> None:
-    global mantri_id
-    if len(players) != 4:
-        raise ValueError("There should be exactly 4 players to assign roles.")
-
-    random.shuffle(players)
-    roles_assigned = dict(zip(players, roles))
-    for player_id, role in roles_assigned.items():
-        await context.bot.send_message(player_id, text=f"Your role: {role}")
-        if role == "Raja":
-            update_player_score(player_id, get_player_score(player_id) + 1000)
-        elif role == "Sipahi":
-            update_player_score(player_id, get_player_score(player_id) + 100)
-        elif role == "Mantri":
-            mantri_id = player_id
-            update_player_score(player_id, get_player_score(player_id) + 500)
-
 # Reset the game state
 def reset_game():
     global players, roles, current_round, mantri_id
@@ -160,7 +145,27 @@ def reset_game():
     roles = ["Raja", "Chor", "Sipahi", "Mantri"]
     current_round = 0
     mantri_id = None
-    reset_database()  # Ensure this function properly clears the database tables
+    reset_database()  # Ensure this function properly clear s the database tables
+    
+
+
+async def assign_roles(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
+    game = games.get(chat_id)
+    if not game or len(game['players']) != 4:
+        raise ValueError("The game is not properly set up.")
+    
+    random.shuffle(game['players'])
+    roles_assigned = dict(zip(game['players'], game['roles']))
+    for player_id, role in roles_assigned.items():
+        await context.bot.send_message(player_id, text=f"Your role: {role}")
+        if role == "Raja":
+            update_player_score(player_id, get_player_score(player_id) + 1000)
+        elif role == "Sipahi":
+            update_player_score(player_id, get_player_score(player_id) + 100)
+        elif role == "Mantri":
+            game['mantri_id'] = player_id
+            update_player_score(player_id, get_player_score(player_id) + 500)
+            
 
 async def guess(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     global mantri_id
@@ -203,6 +208,38 @@ async def end_round(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
         await announce_results(context)
         reset_game()
         await context.bot.send_message(chat_id, text="The game has been reset. Use /startgame to start a new game.")
+
+async def announce_results(context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = context.job.chat_id if hasattr(context.job, 'chat_id') else context.job.chat_id
+    await context.bot.send_message(chat_id, text="Game over! Final scores:")
+    for player_id in players:
+        user = await context.bot.get_chat(player_id)
+        await context.bot
+        
+
+async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.message.from_user
+    if user.id in players:
+        players.remove(user.id)
+        update_player_score(user.id, 0)  # Remove player score from database
+        await update.message.reply_text(f"{user.first_name} left the game. The game is ending.")
+        await announce_results(context)
+        reset_game()
+        await update.message.reply_text("The game has been reset. Use /startgame to start a new game.")
+        
+
+# Dictionary to store game states
+games = {}
+
+# Initialize a new game
+def start_new_game(chat_id):
+    games[chat_id] = {
+        'players': [],
+        'roles': ["Raja", "Chor", "Sipahi", "Mantri"],
+        'current_round': 0,
+        'mantri_id': None
+    }
+
 
 def main() -> None:
     application = ApplicationBuilder().token(Token).build()
