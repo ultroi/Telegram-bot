@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 import os
 import sqlite3
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackContext
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackContext, CallbackQueryHandler
 import random
 
 # Load the .env file
@@ -58,12 +58,10 @@ def reset_database():
 
 async def some_function():
     # Code inside the function should be indented
-    # For example:
     print("Hello, world!")
 
 # Dictionary to store game states
 games = {}
-
 
 # Initialize a new game
 def start_new_game(chat_id):
@@ -79,7 +77,6 @@ def reset_game(chat_id):
     if chat_id in games:
         del games[chat_id]
     reset_database()  # Ensure this function properly clears the database tables
-
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.message.from_user
@@ -114,8 +111,6 @@ async def startgame(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     else:
         await update.message.reply_text("You can only use /startgame in a group chat.")
 
-
- 
 async def join(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.message.chat_id
     user = update.message.from_user
@@ -151,7 +146,6 @@ async def check_start_game(context: CallbackContext) -> None:
         await start_game(chat_id, context)
     else:
         await context.bot.send_message(chat_id, text="Game state error. Please use /startgame to start a new game.")
-
 
 async def assign_roles(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
     game = games.get(chat_id)
@@ -208,7 +202,6 @@ async def guess(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     await end_round(chat_id, context)
 
-
 async def end_round(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Retrieve the game state for the given chat_id
     game = games.get(chat_id)
@@ -233,7 +226,8 @@ async def end_round(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
         await announce_results(chat_id, context)
         del games[chat_id]  # Remove game data for this chat
     else:
-        await start_game(chat_id, context)
+        game['current_round'] += 1
+        await assign_roles(chat_id, context)  # Assign new roles for the next round
 
 async def announce_results(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
     game = games.get(chat_id)
@@ -253,7 +247,6 @@ async def announce_results(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
     winner_id, winner_score = scores[0]
     winner = await context.bot.get_chat(winner_id)
     await context.bot.send_message(chat_id, text=f"The winner is {winner.first_name} with {winner_score} points!")
-
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     help_text = (
