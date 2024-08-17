@@ -11,12 +11,12 @@ load_dotenv(dotenv_path='.env')
 # Get the token from the .env file
 Token = os.getenv("BOT_TOKEN")
 
-# Print the token for debugging
-print(f"Token: {Token}")
-
 # Check if the token is None
 if not Token:
     raise ValueError("No token found. Please check your .env file.")
+
+# Print the token for debugging (not recommended for production)
+print(f"Token: {Token}")
 
 # Define global variables
 players = []
@@ -30,28 +30,40 @@ mantri_id = None
 conn = sqlite3.connect('game.db')
 c = conn.cursor()
 
-# Create tables
+# Create tables if they don't exist
 c.execute('''CREATE TABLE IF NOT EXISTS players (user_id INTEGER PRIMARY KEY, score INTEGER)''')
 c.execute('''CREATE TABLE IF NOT EXISTS games (game_id INTEGER PRIMARY KEY, current_round INTEGER)''')
 
+# Commit changes and close the connection
+conn.commit()
+
 # Function to add or update player score
 def update_player_score(user_id, score):
-    c.execute('INSERT OR REPLACE INTO players (user_id, score) VALUES (?, ?)', (user_id, score))
-    conn.commit()
+    try:
+        c.execute('INSERT OR REPLACE INTO players (user_id, score) VALUES (?, ?)', (user_id, score))
+        conn.commit()
+    except sqlite3.Error as e:
+        print(f"Error updating player score: {e}")
 
 # Function to get player score
 def get_player_score(user_id):
-    c.execute('SELECT score FROM players WHERE user_id = ?', (user_id,))
-    result = c.fetchone()
-    return result[0] if result else 0
+    try:
+        c.execute('SELECT score FROM players WHERE user_id = ?', (user_id,))
+        result = c.fetchone()
+        return result[0] if result else 0
+    except sqlite3.Error as e:
+        print(f"Error retrieving player score: {e}")
+        return 0
 
 # Reset the database
 def reset_database():
-    c.execute('DELETE FROM players')
-    c.execute('DELETE FROM games')
-    conn.commit()
+    try:
+        c.execute('DELETE FROM players')
+        c.execute('DELETE FROM games')
+        conn.commit()
+    except sqlite3.Error as e:
+        print(f"Error resetting database: {e}")
 
-# Command handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.message.from_user
     if update.message.chat.type == 'private':
@@ -80,6 +92,8 @@ async def startgame(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             context.job_queue.run_once(check_start_game, 90, chat_id=update.message.chat_id)
         else:
             await update.message.reply_text("Please interact with the bot in private chat first.")
+    else:
+        await update.message.reply_text("You can only use /startgame in a group chat.")
 
 async def remind_join(context: CallbackContext) -> None:
     await context.bot.send_message(context.job.chat_id, text="30 seconds left to join the game! Use /join to participate.")
@@ -124,6 +138,9 @@ async def start_game(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def assign_roles(context: ContextTypes.DEFAULT_TYPE) -> None:
     global mantri_id
+    if len(players) != 4:
+        raise ValueError("There should be exactly 4 players to assign roles.")
+
     random.shuffle(players)
     roles_assigned = dict(zip(players, roles))
     for player_id, role in roles_assigned.items():
@@ -136,19 +153,34 @@ async def assign_roles(context: ContextTypes.DEFAULT_TYPE) -> None:
             mantri_id = player_id
             update_player_score(player_id, get_player_score(player_id) + 500)
 
+# Reset the game state
+def reset_game():
+    global players, roles, current_round, mantri_id
+    players = []
+    roles = ["Raja", "Chor", "Sipahi", "Mantri"]
+    current_round = 0
+    mantri_id = None
+    reset_database()  # Ensure this function properly clears the database tables
+
 async def guess(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     global mantri_id
     user = update.message.from_user
+
     if user.id == mantri_id:
         try:
+            if not context.args:
+                raise IndexError("No player name provided.")
+                
             guessed_player_name = context.args[0]
-            guessed_player_id = next(player_id for player_id in players if (await context.bot.get_chat(player_id)).first_name == guessed_player_name)
+            guessed_player_id = next(player_id for player_id in players
+                                      if (await context.bot.get_chat(player_id)).first_name == guessed_player_name)
             actual_chor_id = next(player_id for player_id, role in zip(players, roles) if role == "Chor")
-            
+
             if guessed_player_id == actual_chor_id:
                 await update.message.reply_text(f"Correct guess! {guessed_player_name} is the Chor.")
             else:
-                await update.message.reply_text(f"Wrong guess! {guessed_player_name} is not the Chor. {(await context.bot.get_chat(actual_chor_id)).first_name} is the actual Chor.")
+                actual_chor_name = (await context.bot.get_chat(actual_chor_id)).first_name
+                await update.message.reply_text(f"Wrong guess! {guessed_player_name} is not the Chor. {actual_chor_name} is the actual Chor.")
                 update_player_score(mantri_id, get_player_score(mantri_id) - 500)
         except (IndexError, StopIteration):
             await update.message.reply_text("Invalid guess. Please use /guess <player_name>")
@@ -160,9 +192,11 @@ async def guess(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def end_round(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
     global current_round
     await context.bot.send_message(chat_id, text=f"Round {current_round} ended! Current scores:")
+    
     for player_id in players:
         user = await context.bot.get_chat(player_id)
         await context.bot.send_message(chat_id, text=f"{user.first_name}: {get_player_score(player_id)} points")
+    
     if current_round < rounds:
         await start_game(chat_id, context)
     else:
@@ -170,34 +204,16 @@ async def end_round(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
         reset_game()
         await context.bot.send_message(chat_id, text="The game has been reset. Use /startgame to start a new game.")
 
-async def announce_results(context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat_id = context.job.chat_id if hasattr(context.job, 'chat_id') else context.job.chat_id
-    await context.bot.send_message(chat_id, text="Game over! Final scores:")
-    for player_id in players:
-        user = await context.bot.get_chat(player_id)
-        await context.bot.send_message(chat_id, text=f"{user.first_name}: {get_player_score(player_id)} points")
-    
-    if scores:
-        winner = max(scores, key=scores.get)
-        winner_user = await context.bot.get_chat(winner)
-        await context.bot.send_message(chat_id, text=f"The winner is {winner_user.first_name} with {get_player_score(winner)} points!")
-    else:
-        await context.bot.send_message(chat_id, text="No scores to announce.")
-    
-    await context.bot.send_message(chat_id, text="The game has been reset. Use /startgame to start a new game.")
-
 def main() -> None:
     application = ApplicationBuilder().token(Token).build()
 
-    # Command handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("startgame", startgame))
     application.add_handler(CommandHandler("join", join))
     application.add_handler(CommandHandler("leave", leave))
     application.add_handler(CommandHandler("guess", guess))
 
-    # Run the bot
     application.run_polling()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
