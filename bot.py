@@ -218,7 +218,8 @@ async def guess(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await announce_results(chat_id, context)
         del games[chat_id]  # Remove the game from the dictionary
         await context.bot.send_message(chat_id, text="The game has been reset. Use /startgame to start a new game.")
-        
+
+
 
 async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.message.from_user
