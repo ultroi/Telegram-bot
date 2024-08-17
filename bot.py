@@ -117,7 +117,9 @@ def reset_game(chat_id):
 conn = sqlite3.connect('game.db')  # Adjust to your database file path
 cursor = conn.cursor()
 
-def start(update: Update, context: CallbackContext) -> None:
+
+# Initialize database connection and cursor
+async def start(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
     user_first_name = update.message.from_user.first_name
 
@@ -127,8 +129,7 @@ def start(update: Update, context: CallbackContext) -> None:
         result = cursor.fetchone()
 
         if result and result[0] == 1:
-            await
-            update.message.reply_text(f"Hello again, {user_first_name}! You've already interacted with me. How can I assist you today?")
+            await update.message.reply_text(f"Hello again, {user_first_name}! You've already interacted with me. How can I assist you today?")
         else:
             # If not, mark as interacted and send welcome message
             cursor.execute('REPLACE INTO user_interactions (user_id, interacted) VALUES (?, 1)', (user_id,))
@@ -144,12 +145,10 @@ def start(update: Update, context: CallbackContext) -> None:
                 "/help - Show this help message\n\n"
                 "Feel free to explore and let me know how I can help you today!"
             )
-            await
-            update.message.reply_text(welcome_message)
+            await update.message.reply_text(welcome_message)
     except sqlite3.Error as e:
         print(f"Database error: {e}")
-        await
-        update.message.reply_text("An error occurred while accessing the database. Please try again later.")
+        await update.message.reply_text("An error occurred while accessing the database. Please try again later.")
         
 
 # Function to start the game
