@@ -59,6 +59,26 @@ async def send_message(update: Update, context: CallbackContext):
     )
 
 
+async def schedule_task(task, delay):
+    """
+    Schedules a task to be executed after a specified delay.
+
+    :param task: The function to be executed.
+    :param delay: The delay in seconds before the task is executed.
+    """
+    await asyncio.sleep(delay)
+    await task()
+
+# Example task function
+async def example_task():
+    print("Task executed!")
+
+# Example usage
+async def main():
+    await schedule_task(example_task, 10)  # Schedule `example_task` to run after 10 seconds
+
+
+
 def start_scheduled_job(job_queue: JobQueue, chat_id: int):
     job_queue.run_once(
         callback=scheduled_task,
