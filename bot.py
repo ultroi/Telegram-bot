@@ -96,19 +96,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await update.message.reply_text("Please send me a message in private chat first to interact with the bot.")
 
 async def startgame(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.message.chat_id
     if update.message.chat.type != 'private':
         if context.user_data.get('interacted'):
             await update.message.reply_text("Game is starting! Use /join to participate. You have 1.5 minutes to join.")
-            context.job_queue.run_once(remind_join, 60, chat_id=update.message.chat_id)
-            context.job_queue.run_once(check_start_game, 90, chat_id=update.message.chat_id)
+            context.job_queue.run_once(remind_join, 60, chat_id=chat_id)
+            context.job_queue.run_once(check_start_game, 90, chat_id=chat_id)
+            start_new_game(chat_id)  # Initialize the game state
         else:
             await update.message.reply_text("Please interact with the bot in private chat first.")
     else:
         await update.message.reply_text("You can only use /startgame in a group chat.")
 
-async def remind_join(context: CallbackContext) -> None:
-    await context.bot.send_message(context.job.chat_id, text="30 seconds left to join the game! Use /join to participate.")
 
+ 
 async def join(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.message.chat_id
     user = update.message.from_user
@@ -127,21 +128,24 @@ async def join(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     else:
         await update.message.reply_text("You are already in the game.")
 
+# Function to remind users to join the game
+async def remind_join(context: CallbackContext) -> None:
+    await context.bot.send_message(context.job.chat_id, text="30 seconds left to join the game! Use /join to participate.")
 
-async def start_game(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
+# Function to check if enough players have joined
+async def check_start_game(context: CallbackContext) -> None:
+    chat_id = context.job.chat_id
     game = games.get(chat_id)
-    if not game:
-        return
+    
+    if game and len(game['players']) < 4:
+        await context.bot.send_message(chat_id, text="Not enough players joined. The game is ending.")
+        reset_game(chat_id)  # Reset the game state
+        await context.bot.send_message(chat_id, text="Use /startgame to start a new game.")
+    elif game and len(game['players']) == 4:
+        await start_game(chat_id, context)
+    else:
+        await context.bot.send_message(chat_id, text="Game state error. Please use /startgame to start a new game.")
 
-    game['current_round'] += 1
-    if game['current_round'] > 5:
-        await announce_results(chat_id, context)
-        del games[chat_id]  # Remove the game from the dictionary
-        return
-
-    await context.bot.send_message(chat_id, text=f"Round {game['current_round']} is starting!")
-    await assign_roles(chat_id, context)
-    await context.bot.send_message(chat_id, text="Mantri, please guess who the Chor is by using /guess <player_name>")
 
 async def assign_roles(chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
     game = games.get(chat_id)
