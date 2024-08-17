@@ -75,7 +75,7 @@ def start_scheduled_job(job_queue: JobQueue, chat_id: int):
     :param chat_id: The chat ID where the scheduled task will operate.
     """
     job_queue.run_repeating(
-        callback=scheduled_task,
+        callback=partial(scheduled_task),
         interval=3600,  # Interval in seconds (e.g., 3600 seconds = 1 hour)
         first=0,  # Start immediately
         context={'chat_id': chat_id}  # Pass context using a dictionary
