@@ -1,23 +1,29 @@
 import sqlite3
 
-# Connect to the database (this will create the database file if it doesn't exist)
-conn = sqlite3.connect('game.db')
-c = conn.cursor()
+def setup_database():
+    conn = sqlite3.connect('game.db')
+    c = conn.cursor()
 
-# Create tables if they don't exist
-c.execute('''CREATE TABLE IF NOT EXISTS players (
-    user_id INTEGER PRIMARY KEY,
-    score INTEGER
-    notified BOOLEAN DEFAULT
-)''')
+    # Create tables
+    c.execute('''CREATE TABLE IF NOT EXISTS players (
+        user_id INTEGER PRIMARY KEY,
+        score INTEGER,
+        notified BOOLEAN DEFAULT FALSE
+    )''')
 
-c.execute('''CREATE TABLE IF NOT EXISTS games (
-    game_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    current_round INTEGER
-)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS games (
+        game_id INTEGER PRIMARY KEY,
+        current_round INTEGER
+    )''')
 
-# Commit changes and close the connection
-conn.commit()
-conn.close()
+    # Add 'notified' column if it doesn't exist
+    try:
+        c.execute("ALTER TABLE players ADD COLUMN notified BOOLEAN DEFAULT FALSE")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
 
-print("Database setup completed successfully.")
+    conn.commit()
+    conn.close()
+
+if __name__ == "__main__":
+    setup_database()
