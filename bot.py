@@ -146,48 +146,7 @@ async def check_start_game(context: CallbackContext) -> None:
     else:
         await context.bot.send_message(chat_id, text="Game state error. Please use /startgame to start a new game.")
 
-async def start_game(update: Update, context: CallbackContext) -> None:
-    chat_id = update.message.chat_id
-    game = games.get(chat_id)
 
-    if not game:
-        await context.bot.send_message(chat_id, text="No game is currently running in this chat.")
-        return
-
-    players = game['players']
-    
-    if len(players) < 4:
-        await context.bot.send_message(chat_id, text="Not enough players to start the game. Need at least 4 players.")
-        return
-
-    # Assign roles
-    roles = ['Raja', 'Mantri', 'Sipahi', 'Chor']
-    random.shuffle(roles)
-    roles_assigned = dict(zip(players, roles))
-
-    # Notify players of their roles
-    for player_id, role in roles_assigned.items():
-        await context.bot.send_message(player_id, text=f"Your role is: {role}")
-
-    # Notify the group
-    await context.bot.send_message(chat_id, text="Roles have been assigned. Check your private messages.")
-
-    # Example scoring mechanism
-    for player_id, role in roles_assigned.items():
-        if role == 'Raja':
-            update_player_score(player_id, get_player_score(player_id) + 1000)
-        elif role == 'Mantri':
-            update_player_score(player_id, get_player_score(player_id) + 500)
-            game['mantri_id'] = player_id  # Set Mantri
-        elif role == 'Sipahi':
-            update_player_score(player_id, get_player_score(player_id) + 100)
-
-    # Handle rounds
-    if game['current_round'] < 5:
-        context.job_queue.run_once(check_start_game, 90, context={'chat_id': chat_id, 'update': update})
-    else:
-        await context.bot.send_message(chat_id, text="Game over!")
-        reset_game(chat_id)
 
 
 async def join(update: Update, context: CallbackContext) -> None:
@@ -207,6 +166,75 @@ async def join(update: Update, context: CallbackContext) -> None:
             await start_game(update, context)
     else:
         await update.message.reply_text("You are already in the game.")
+
+async def start_game(update: Update, context: CallbackContext) -> None:
+    chat_id = update.message.chat_id
+
+    # Initialize a new game if none exists
+    if chat_id not in games:
+        start_new_game(chat_id)
+    
+    game = games[chat_id]
+
+    if not game:
+        await context.bot.send_message(chat_id, text="No game is currently running in this chat.")
+        return
+
+    players = game['players']
+    
+    if len(players) < 4:
+        await context.bot.send_message(chat_id, text="Not enough players to start the game. Need at least 4 players.")
+        return
+
+    # Assign roles
+    roles = ['Raja', 'Mantri', 'Sipahi', 'Chor']
+    random.shuffle(roles)
+    roles_assigned = dict(zip(players, roles))
+
+    # Notify players of their roles
+    for player_id, role in roles_assigned.items():
+        try:
+            await context.bot.send_message(player_id, text=f"Your role is: {role}")
+        except Exception as e:
+            print(f"Failed to send role message to player {player_id}: {e}")
+
+    # Notify the group
+    try:
+        await context.bot.send_message(chat_id, text="Roles have been assigned. Check your private messages.")
+    except Exception as e:
+        print(f"Failed to send group message: {e}")
+
+    # Example scoring mechanism
+    for player_id, role in roles_assigned.items():
+        if role == 'Raja':
+            update_player_score(player_id, get_player_score(player_id) + 1000)
+        elif role == 'Mantri':
+            update_player_score(player_id, get_player_score(player_id) + 500)
+            game['mantri_id'] = player_id  # Set Mantri
+        elif role == 'Sipahi':
+            update_player_score(player_id, get_player_score(player_id) + 100)
+
+    # Handle rounds
+    if game['current_round'] < 5:
+        try:
+            context.job_queue.run_once(
+                callback=check_start_game,
+                when=90,  # Time in seconds before the job is run
+                context={'chat_id': chat_id}
+            )
+        except Exception as e:
+            print(f"Failed to schedule job: {e}")
+    else:
+        await context.bot.send_message(chat_id, text="Game over!")
+        reset_game(chat_id)
+
+def start_new_game(chat_id):
+    games[chat_id] = {
+        'players': [],
+        'roles': ['Raja', 'Chor', 'Sipahi', 'Mantri'],
+        'current_round': 0,
+        'mantri_id': None
+    }
 
 async def assign_roles(chat_id, context: CallbackContext) -> None:
     game = games.get(chat_id)
