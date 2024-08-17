@@ -66,14 +66,8 @@ async def scheduled_task(context: CallbackContext):
         chat_id=chat_id,
         text="This is a scheduled message."
     )
-    
-def start_scheduled_job(job_queue: JobQueue, chat_id: int):
-    """
-    Schedules a task to be executed periodically or at a specific time.
 
-    :param job_queue: The JobQueue instance from the application.
-    :param chat_id: The chat ID where the scheduled task will operate.
-    """
+def start_scheduled_job(job_queue: JobQueue, chat_id: int):
     job_queue.run_repeating(
         callback=partial(scheduled_task),
         interval=3600,  # Interval in seconds (e.g., 3600 seconds = 1 hour)
