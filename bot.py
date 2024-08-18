@@ -516,4 +516,8 @@ if __name__ == '__main__':
         logger.info("Bot stopped by user.")
     except Exception as e:
         logger.error(f"An error occurred: {e}")
-        loop.run_until_complete(application.shutdown())
+        try:
+            if 'application' in globals():
+                loop.run_until_complete(application.shutdown())
+        except NameError:
+            logger.error("Application is not defined.")
