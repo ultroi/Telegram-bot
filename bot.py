@@ -60,13 +60,6 @@ async def send_message(update: Update, context: CallbackContext):
     )
 
 
-
-async def periodic_task(chat_id: int, bot):
-    while True:
-        await bot.send_message(chat_id, "This is a periodic message.")
-        await asyncio.sleep(60)  # Sleep for 60 seconds
-
- 
 def has_interacted(user_id):
     try:
         with sqlite3.connect('game.db') as conn:
@@ -495,16 +488,18 @@ async def main():
     application.add_handler(CommandHandler("join", join))
     application.add_handler(CommandHandler("leave", leave_game))
     application.add_handler(CommandHandler("guess", guess))
-    
+
+    # Start the bot
     try:
         await application.initialize()
         await application.start()
-        print("Bot started. Press Ctrl+C to stop.")
+        logger.info("Bot started. Press Ctrl+C to stop.")
+
+        # Keep the bot running
         await application.updater.start_polling()
     except Exception as e:
-        print(f"Error running the bot: {e}")
+        logger.error(f"An error occurred: {e}")
     finally:
-        await application.updater.stop()
         await application.stop()
         await application.shutdown()
 
@@ -512,13 +507,13 @@ if __name__ == '__main__':
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            print("Event loop is already running. Adding main() as a task.")
+            logger.info("Event loop is already running. Adding main() as a task.")
             task = loop.create_task(main())
             task.add_done_callback(lambda t: loop.stop())
         else:
-            print("Starting new event loop.")
+            logger.info("Starting new event loop.")
             loop.run_until_complete(main())
     except KeyboardInterrupt:
-        pass
+        logger.info("Bot stopped by user.")
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}")
