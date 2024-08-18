@@ -500,7 +500,7 @@ async def main():
         application.add_handler(CommandHandler("guess", guess))
 
     # This line ensures the bot keeps running
-    application.run_polling()
+    application.run_polling() # This line should be at the correct indentation level
 
 if __name__ == '__main__':
-    main()
+    main()  # Make sure this is also correctly indented
