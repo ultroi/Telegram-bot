@@ -516,3 +516,4 @@ if __name__ == '__main__':
         logger.info("Bot stopped by user.")
     except Exception as e:
         logger.error(f"An error occurred: {e}")
+        loop.run_until_complete(application.shutdown())
