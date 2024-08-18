@@ -482,19 +482,18 @@ async def leave_game(update: Update, context: CallbackContext) -> None:
             player_first_name = player_details.first_name
             status_message += f"👤 [{player_first_name}](tg://user?id={player_id})\n"
         await context.bot.send_message(chat_id, text=status_message, parse_mode=ParseMode.MARKDOWN)
-        
+
 
 async def main():
-    application = ApplicationBuilder().token(Token).build()
-    job_queue = application.job_queue
-
+    try:
+        application = ApplicationBuilder().token(Token).build()
+        job_queue = application.job_queue
     
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("startgame", start_game))
-    application.add_handler(CommandHandler("join", join))
-    application.add_handler(CommandHandler("leave", leave_game))
-    application.add_handler(CommandHandler("guess", guess))
-
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("startgame", start_game))
+        application.add_handler(CommandHandler("join", join))
+        application.add_handler(CommandHandler("leave", leave_game))
+        application.add_handler(CommandHandler("guess", guess))
 
         # Setup scheduler if you use it
         scheduler = AsyncIOScheduler()
