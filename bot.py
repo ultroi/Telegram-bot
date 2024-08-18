@@ -505,7 +505,10 @@ async def main():
     await application.updater.start_polling()
     await application.updater.idle()
 
-# Run the main function
+# Run the main function with proper exception handling
 if __name__ == '__main__':
-    import asyncio
-    asyncio.run(main())
+    try:
+        import asyncio
+        asyncio.run(main())
+    except Exception as e:
+        logger.exception("An error occurred while running the bot: %s", e)
