@@ -508,7 +508,7 @@ async def main():
         await application.initialize()
         await application.start()
         await application.updater.start_polling()
-        await application.updater.idle()
+        
 
     except Exception as e:
         logger.exception("An error occurred while running the bot: %s", e)
