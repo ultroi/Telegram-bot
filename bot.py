@@ -499,23 +499,13 @@ async def main():
         application.add_handler(CommandHandler("leave", leave_game))
         application.add_handler(CommandHandler("guess", guess))
 
-        # Setup scheduler if you use it
-        scheduler = AsyncIOScheduler()
-        scheduler.start()
+    logger.info("Starting the bot...")
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+    await application.updater.idle()
 
-        # Start the Bot
-        logger.info("Starting the bot...")
-        await application.initialize()
-        await application.start()
-        await application.updater.start_polling()
-        
-
-    except Exception as e:
-        logger.exception("An error occurred while running the bot: %s", e)
-
+# Run the main function
 if __name__ == '__main__':
-    try:
-        import asyncio
-        asyncio.run(main())
-    except Exception as e:
-        logger.exception("An error occurred while running the main function: %s", e)
+    import asyncio
+    asyncio.run(main())
