@@ -479,7 +479,7 @@ async def main():
     # Define command handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("join", join))
-    application.add_handler(CommandHandler("startgame", startgame))
+    application.add_handler(CommandHandler("startgame", start_game))
     application.add_handler(CommandHandler("guess", guess))
     application.add_handler(CommandHandler("leave", leave))
     application.add_handler(CommandHandler("gstats", gstats))
