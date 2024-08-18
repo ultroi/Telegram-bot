@@ -497,10 +497,15 @@ async def main():
     application.add_handler(CommandHandler("guess", guess))
     
     try:
-        await application.run_polling()
+        await application.initialize()
+        await application.start()
+        print("Bot started. Press Ctrl+C to stop.")
+        await application.updater.start_polling()
     except Exception as e:
         print(f"Error running the bot: {e}")
     finally:
+        await application.updater.stop()
+        await application.stop()
         await application.shutdown()
 
 if __name__ == '__main__':
