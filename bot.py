@@ -1,4 +1,6 @@
 from dotenv import load_dotenv
+import datetime
+from zoneinfo import ZoneInfo
 import random
 from functools import partial
 import os
@@ -67,6 +69,19 @@ async def send_message(update: Update, context: CallbackContext):
         parse_mode=ParseMode.HTML  # or ParseMode.MARKDOWN, depending on your needs
     )
 
+def schedule_reminder(user_id):
+    # ... (Get user's class time from user_data) ...
+
+    # Assume the user's time zone is India (Asia/Kolkata)
+    user_timezone = ZoneInfo("Asia/Kolkata") 
+    class_time = datetime.time(18, 00) # Example: 6:00 PM
+    reminder_time = datetime.datetime.combine(datetime.date.today(), class_time, tzinfo=user_timezone)
+
+    reminder_job = bot.job.Job(send_reminder, user_id, time_to_wait=datetime.timedelta(seconds=1)) 
+    reminder_job.set_next(due=reminder_time) 
+    bot.job.add_job(reminder_job)
+
+
 
 def has_interacted(user_id):
     try:
@@ -119,15 +134,6 @@ def reset_database():
         logging.error(f"Error resetting database: {e}")
 
 
-def start_new_game(chat_id):
-    games[chat_id] = {
-        'players': [],
-        'roles': ["Raja", "Chor", "Sipahi", "Mantri"],
-        'current_round': 0,
-        'mantri_id': None,
-        'start_time': datetime.now() + timedelta(minutes=1.5)  # Game start time
-    }
-
 def reset_game(chat_id):
     if chat_id in games:
         del games[chat_id]
@@ -170,8 +176,6 @@ async def check_start_game(context: CallbackContext) -> None:
         await start_game(context.job.context['update'], context)
     else:
         await context.bot.send_message(chat_id, text="Game state error. Please use /startgame@whothiefbot to start a new game.")
-
-
 
 
 async def join(update: Update, context: CallbackContext) -> None:
