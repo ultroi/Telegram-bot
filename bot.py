@@ -495,6 +495,7 @@ async def main():
     application.add_handler(CommandHandler("leave", leave_game))
     application.add_handler(CommandHandler("guess", guess))
 
+
         # Setup scheduler if you use it
         scheduler = AsyncIOScheduler()
         scheduler.start()
