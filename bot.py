@@ -14,6 +14,9 @@ from telegram.ext import (
     JobQueue,
     CallbackQueryHandler,
 )
+import httpx
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 
 # Load the .env file
 load_dotenv(dotenv_path='.env')
@@ -26,7 +29,11 @@ if not Token:
     raise ValueError("No token found. Please check your .env file.")
 
 # Setup logging
-logging.basicConfig(level=logging.INFO)
+# Configure logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 logger = logging.getLogger(__name__)
 
 # Database setup
@@ -488,34 +495,23 @@ async def main():
     application.add_handler(CommandHandler("leave", leave_game))
     application.add_handler(CommandHandler("guess", guess))
 
-    # Start the bot
-    try:
+        # Setup scheduler if you use it
+        scheduler = AsyncIOScheduler()
+        scheduler.start()
+
+        # Start the Bot
+        logger.info("Starting the bot...")
         await application.initialize()
         await application.start()
-        logger.info("Bot started. Press Ctrl+C to stop.")
-
-        # Keep the bot running
         await application.updater.start_polling()
+        await application.updater.idle()
+
     except Exception as e:
-        logger.error(f"An error occurred: {e}")
-    finally:
-        await application.updater.stop()
-        await application.stop()
-        await application.shutdown()
+        logger.exception("An error occurred while running the bot: %s", e)
 
 if __name__ == '__main__':
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            logger.info("Event loop is already running. Adding main() as a task.")
-            task = loop.create_task(main())
-            task.add_done_callback(lambda t: loop.stop())
-        else:
-            logger.info("Starting new event loop.")
-            loop.run_until_complete(main())
-    except KeyboardInterrupt:
-        logger.info("Bot stopped by user.")
+        import asyncio
+        asyncio.run(main())
     except Exception as e:
-        logger.error(f"An error occurred: {e}")
-        if 'application' in globals():
-            loop.run_until_complete(application.shutdown())
+        logger.exception("An error occurred while running the main function: %s", e)
