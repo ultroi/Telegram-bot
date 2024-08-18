@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 import datetime
+import nest_asyncio
 from zoneinfo import ZoneInfo
 import random
 from functools import partial
@@ -39,6 +40,9 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+# Allow nest_asyncio to allow nested event loop
+nest_asyncio.apply()
 
 # Database setup
 def init_db():
