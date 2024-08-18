@@ -487,7 +487,7 @@ async def main():
     application = ApplicationBuilder().token(Token).build()
     job_queue = application.job_queue
 
-    chat_id = 123456789  # Replace with your chat ID
+    chat_id = -1002201661092  # Replace with your chat ID
     asyncio.create_task(periodic_task(chat_id, application.bot))
 
     application.add_handler(CommandHandler("start", start))
