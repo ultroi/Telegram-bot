@@ -25,8 +25,9 @@ Token = os.getenv("BOT_TOKEN")
 if not Token:
     raise ValueError("No token found. Please check your .env file.")
 
-# Initialize logging
+# Setup logging
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Database setup
 def init_db():
