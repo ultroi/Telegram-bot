@@ -402,3 +402,90 @@ async def end_round(chat_id: int, context: CallbackContext) -> None:
         await start_next_round(chat_id, context)
 
 
+async def guess(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.from_user.id not in players:
+        await update.message.reply_text("You are not in the game! Use /join to participate.")
+        return
+
+    if player_roles.get(update.message.from_user.id) != "Mantri 🤵":
+        await update.message.reply_text("Only the Mantri can guess!")
+        return
+
+    # Creating inline buttons for the Mantri to guess
+    keyboard = [
+        [InlineKeyboardButton(f"{await context.bot.get_chat(player_id).first_name}", callback_data=str(player_id))] for player_id in players if player_roles[player_id] != "Mantri 🤵"
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text("Who is the Chor? Make your guess:", reply_markup=reply_markup)
+
+# Callback handler for the guess buttons
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    guessed_player_id = int(query.data)
+    guessed_role = player_roles[guessed_player_id]
+    mantri = await context.bot.get_chat(update.callback_query.from_user.id)
+    chor = await context.bot.get_chat(guessed_player_id)
+    
+    if guessed_role == "Chor 🕵️‍♂️":
+        await query.edit_message_text(f"Correct! {chor.first_name} is the Chor! 🎉")
+    else:
+        await query.edit_message_text(f"Wrong guess! {chor.first_name} is not the Chor. 😔")
+
+    await announce_final_result(context, mantri, chor)
+    reset_game()
+
+# Function to announce the final result in the group chat
+async def announce_final_result(context: ContextTypes.DEFAULT_TYPE, mantri, chor):
+    result = f"The game has ended.\n\n"
+    result += f"Mantri ({mantri.first_name}) guessed that Chor is {chor.first_name}.\n"
+    result += f"Correct Answer: {player_roles[chor.id] == 'Chor 🕵️‍♂️'}.\n"
+    
+    await context.bot.send_message(context.chat_data['chat_id'], result)
+
+async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.message.from_user
+    if user.id in players:
+        players.remove(user.id)
+        await update.message.reply_text(f"{user.first_name} left the game.")
+        await end_game_due_to_leave(context, user)
+    else:
+        await update.message.reply_text("You are not in the game!")
+
+# Function to handle the game ending when someone leaves
+async def end_game_due_to_leave(context: ContextTypes.DEFAULT_TYPE, user):
+    await context.bot.send_message(context.chat_data['chat_id'], f"{user.first_name} has left the game. The game is over.")
+    reset_game()
+
+# /gstats command - Shows the current game status (for debugging)
+async def gstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    stats_message = "Current Players and Roles:\n"
+    for player_id in players:
+        user = await context.bot.get_chat(player_id)
+        role = player_roles.get(player_id, "Not assigned")
+        stats_message += f"{user.first_name} ({user.username}): {role}\n"
+    await update.message.reply_text(stats_message)
+
+# Main function to start the bot
+async def main():
+    application = Application.builder().token(Token).build()
+    job_queue = application.job_queue
+
+    
+    # Define command handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("join", join))
+    application.add_handler(CommandHandler("startgame", startgame))
+    application.add_handler(CommandHandler("guess", guess))
+    application.add_handler(CommandHandler("leave", leave))
+    application.add_handler(CommandHandler("gstats", gstats))
+    application.add_handler(CallbackQueryHandler(button))
+
+    # Start the bot
+    await application.run_polling()
+
+if __name__ == '__main__':
+    import asyncio
+    asyncio.run(h main())
