@@ -495,15 +495,25 @@ async def main():
     application.add_handler(CommandHandler("join", join))
     application.add_handler(CommandHandler("leave", leave_game))
     application.add_handler(CommandHandler("guess", guess))
-
-    await application.run_polling()
-
-async def shutdown(application):
-    await application.stop()
-    await application.wait_closed()
-
-if __name__ == "__main__":
+    
     try:
-        asyncio.run(main())
+        await application.run_polling()
+    except Exception as e:
+        print(f"Error running the bot: {e}")
+    finally:
+        await application.shutdown()
+
+if __name__ == '__main__':
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            print("Event loop is already running. Adding main() as a task.")
+            task = loop.create_task(main())
+            task.add_done_callback(lambda t: loop.stop())
+        else:
+            print("Starting new event loop.")
+            loop.run_until_complete(main())
     except KeyboardInterrupt:
-        logging.info("Bot stopped by user.")
+        pass
+    except Exception as e:
+        print(f"An error occurred: {e}")
