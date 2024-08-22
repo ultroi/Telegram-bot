@@ -11,6 +11,7 @@ from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTyp
 # Load environment variables
 load_dotenv(dotenv_path='.env')
 TOKEN = os.getenv("BOT_TOKEN_1")
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")  # Ensure this is correctly set in .env
 GITHUB_TOKEN = "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"
 REPO_OWNER = 'ultroi'
 REPO_NAME = 'Telegram-bot'
