@@ -102,12 +102,9 @@ def main() -> None:
     # Initialize the Updater with the token from the .env file
     application = ApplicationBuilder().token(Token).build()
 
-    updater.dispatcher.add_handler(CommandHandler('start', start))
-    updater.dispatcher.add_handler(CallbackQueryHandler(button))
+    application.add_handler(CommandHandler('start', start))
+    application.add_handler(CallbackQueryHandler(button))
 
     # Start the Bot
-    updater.start_polling()
-    updater.idle()
-
-if __name__ == '__main__':
-    main()
+    application.run_polling()
+ 
