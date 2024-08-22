@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
+from telegram.ext import Updater, ApplicationBuilder, CommandHandler, CallbackQueryHandler, CallbackContext
 
 # Load the .env file
 load_dotenv(dotenv_path='.env')
@@ -100,7 +100,7 @@ def reset_game() -> None:
 
 def main() -> None:
     # Initialize the Updater with the token from the .env file
-    updater = Updater(Token)
+    application = ApplicationBuilder().token(Token).build()
 
     updater.dispatcher.add_handler(CommandHandler('start', start))
     updater.dispatcher.add_handler(CallbackQueryHandler(button))
