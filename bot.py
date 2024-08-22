@@ -22,6 +22,12 @@ from telegram.ext import (
 import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+# Constants for roles
+RAJA = "Raja"
+MANTRI = "Mantri 🤵"
+SIPAHI = "Sipahi"
+CHOR = "Chor 🕵️‍♂️"
+
 
 # Load the .env file
 load_dotenv(dotenv_path='.env')
