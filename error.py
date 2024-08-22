@@ -52,7 +52,7 @@ def analyze_and_fix_error(error_message: str) -> str:
         return "General error. Review the error message and code carefully."
 
 async def handle_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if update.effective_chat.id != -100220166109:
+    if update.effective_chat.id != -1002201661092:
         return
 
     # Fetch current file content from GitHub
