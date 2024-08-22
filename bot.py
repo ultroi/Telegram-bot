@@ -355,15 +355,47 @@ async def end_round(chat_id, context: CallbackContext) -> None:
         await end_game(chat_id, context)
 
 
-           
-async def start_next_round(chat_id: int, context: CallbackContext) -> None:
+
+async def guess(update: Update, context: CallbackContext) -> None:
+    user_id = update.message.from_user.id
+    chat_id = update.message.chat_id
     game = games.get(chat_id)
+
     if not game:
+        await update.message.reply_text("No game is currently running in this chat.")
         return
+
+    if user_id != game.get('mantri_id'):
+        await update.message.reply_text("Only the Mantri can make a guess.")
+        return
+
+    # Check if a guess was provided
+    if len(context.args) != 1:
+        await update.message.reply_text("Usage: /guess <player_name>")
+        return
+
+    guess_name = context.args[0]
+    guessed_player_id = None
+
+    for player_id, player_name in zip(game['players'], context.args):
+        if player_name == guess_name:
+            guessed_player_id = player_id
+            break
+
+    if guessed_player_id is None:
+        await update.message.reply_text(f"No player found with the name {guess_name}.")
+        return
+
+    chor_id = next(player_id for player_id, role in zip(game['players'], game['roles']) if role == CHOR)
     
-    # Start a new round by reassigning roles
-    await context.bot.send_message(chat_id, "Starting the next round...")
-    await assign_roles(chat_id, context)
+    if guessed_player_id == chor_id:
+        await update.message.reply_text(f"Congratulations! {context.args[0]} was the Chor!")
+        await context.bot.send_message(chat_id, text=f"The Mantri guessed correctly! {context.args[0]} was indeed the Chor.")
+        reset_game(chat_id)  # End the game
+    else:
+        await update.message.reply_text(f"Sorry, {context.args[0]} was not the Chor. Try again!")
+        await context.bot.send_message(chat_id, text=f"The Mantri guessed wrong. The game continues.")
+
 
 async def assign_roles(chat_id: int, context: CallbackContext) -> None:
     game = games.get(chat_id)
@@ -446,17 +478,7 @@ async def button(update: Update, context: CallbackContext) -> None:
     await announce_final_result(context, chat_id, mantri, chor)
     reset_game(chat_id)
 
-async def end_round(chat_id: int, context: CallbackContext) -> None:
-    game = games.get(chat_id)
-    if not game:
-        return
-
-    game['current_round'] += 1
-    if game['current_round'] > game['total_rounds']:
-        await announce_final_results(chat_id, context)
-    else:
-        await start_next_round(chat_id, context)
-
+ 
 async def announce_final_result(context: CallbackContext, chat_id: int, mantri, chor) -> None:
     game = games.get(chat_id)
     if not game:
@@ -473,22 +495,48 @@ async def reset_game(chat_id: int) -> None:
         del games[chat_id]
         # Optionally reset game state in a persistent storage if implemented
 
-# Existing code for handling the /gstats command and other functionalities remains unchanged
+
+async def leave(update: Update, context: CallbackContext) -> None:
+    user_id = update.message.from_user.id
+    chat_id = update.message.chat_id
+    game = games.get(chat_id)
+
+    if not game:
+        await update.message.reply_text("No game is currently running in this chat.")
+        return
+
+    if user_id not in game['players']:
+        await update.message.reply_text("You are not in the game.")
+        return
+
+    # Remove player from the game
+    game['players'].remove(user_id)
+    if user_id == game.get('mantri_id'):
+        # Assign a new Mantri if the current Mantri leaves
+        if game['players']:
+            game['mantri_id'] = random.choice(game['players'])
+        else:
+            # End the game if no players left
+            await context.bot.send_message(chat_id, text="No players left. The game is ending.")
+            reset_game(chat_id)
+            return
+
+    update_player_score(user_id, get_player_score(user_id))  # Update score in database
+    await update.message.reply_text("You have left the game.")
+    await context.bot.send_message(chat_id, text=f"{update.message.from_user.first_name} has left the game.")
+
+    # Check if the game needs to end or if players need to be notified
+    if len(game['players']) < 4:
+        await context.bot.send_message(chat_id, text="Not enough players! The game is ending.")
+        reset_game(chat_id)
+
 
 # Function to handle the game ending when someone leaves
 async def end_game_due_to_leave(context: ContextTypes.DEFAULT_TYPE, user):
     await context.bot.send_message(context.chat_data['chat_id'], f"{user.first_name} has left the game. The game is over.")
     reset_game()
 
-# /gstats command - Shows the current game status (for debugging)
-async def gstats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    stats_message = "Current Players and Roles:\n"
-    for player_id in players:
-        user = await context.bot.get_chat(player_id)
-        role = player_roles.get(player_id, "Not assigned")
-        stats_message += f"{user.first_name} ({user.username}): {role}\n"
-    await update.message.reply_text(stats_message)
-
+ 
 # Main function to start the bot
 async def main():
     application = Application.builder().token(Token).build()
