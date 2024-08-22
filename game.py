@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, CallbackContext
 
 # Load the .env file
 load_dotenv(dotenv_path='.env')
@@ -13,9 +13,30 @@ Token = os.getenv("BOT_TOKEN")
 if not Token:
     raise ValueError("No token found. Please check your .env file.")
 
+import logging
+
+class TelegramLoggingHandler(logging.Handler):
+    def emit(self, record):
+        log_entry = self.format(record)
+        send_error_notification(log_entry)
+
+# Set up the custom handler
+telegram_handler = TelegramLoggingHandler()
+telegram_handler.setLevel(logging.ERROR)  # Send only error messages
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+telegram_handler.setFormatter(formatter)
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logger.addHandler(telegram_handler)
+LOG_CHAT_ID = '-1002201661092'
+
 # Dictionary to store game data for each group chat
 games = {}
 game_started = False
+
+def send_error_notification(message: str):
+    bot.send_message(chat_id=LOG_CHAT_ID, text=message)
 
 # Function to check if the bot is in a group chat
 def in_group_chat(update: Update) -> bool:
@@ -153,13 +174,24 @@ def reset_game(chat_id: int) -> None:
     if chat_id in games:
         del games[chat_id]
 
+
+async def error_handler(update: Update, context: CallbackContext):
+    # Log the error
+    error_message = f'Update {update} caused error {context.error}'
+    logging.error(error_message)
+    # Notify the group chat about the error
+    send_error_notification(error_message)
+
+
 def main() -> None:
     # Initialize the Application with the token from the .env file
     application = ApplicationBuilder().token(Token).build()
 
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CommandHandler('startgame', start_game))
+    application.add_handler(ErrorHandler(error_handler))
     application.add_handler(CallbackQueryHandler(button))
+    
 
     # Start the Bot
     application.run_polling()
