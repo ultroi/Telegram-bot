@@ -186,7 +186,7 @@ def main() -> None:
 
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CommandHandler('startgame', start_game))
-    application.add_handler(ErrorHandler(error_handler))
+    application.add_error_handler(error_handler)
     application.add_handler(CallbackQueryHandler(button))
     
 
