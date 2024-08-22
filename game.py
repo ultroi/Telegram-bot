@@ -16,10 +16,6 @@ if not Token:
 # Dictionary to store game data for each group chat
 games = {}
 
-# Function to check if the bot is in a group chat
-def in_group_chat(update: Update) -> bool:
-    return update.effective_chat.type in ['group', 'supergroup']
-
 # Show instructions when /start is called
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     instructions = ("Welcome to the Rock-Paper-Scissors bot!\n\n"
@@ -31,63 +27,83 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(instructions)
 
 # Start a new game when /startgame is called
-async def start_game(update: Update, context: CallbackContext):
-    global game_started
-    if game_started:
+async def start_game(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.effective_chat.id
+
+    if chat_id in games and games[chat_id]['game_started']:
         await update.message.reply_text("A game is already in progress.")
         return
+
+    games[chat_id] = {
+        'players': [],
+        'player_choices': {},
+        'game_started': False
+    }
 
     keyboard = [[InlineKeyboardButton("Join the Game", callback_data='join')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text('Click "Join the Game" to participate:', reply_markup=reply_markup)
 
-async def join_game(update: Update, context: CallbackContext):
-    global game_started
+async def join_game(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
+    chat_id = query.message.chat_id
     player_id = query.from_user.id
 
-    if player_id in players:
+    game = games.get(chat_id)
+    
+    if not game:
+        await query.answer(text="No game in progress.")
+        return
+
+    if player_id in game['players']:
         await query.answer(text="You have already joined.")
         return
 
-    if len(players) >= 2:
+    if len(game['players']) >= 2:
         await query.answer(text="The game is already full.")
         return
 
-    # Add player to the game
-    players[player_id] = 'joined'
+    game['players'].append(player_id)
+    game['player_choices'][player_id] = None
+
     await query.answer(text="You have joined the game!")
 
-    if len(players) == 2:
-        game_started = True
+    if len(game['players']) == 2:
+        game['game_started'] = True
         await query.message.reply_text("Both players have joined. The game is starting!")
-        # Optionally, you can send instructions or start the game directly here
-
+        await start_game_round(update, context)
 
 # Handle button clicks (join and choice selection)
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    user = query.from_user
     chat_id = query.message.chat_id
-    game = games[chat_id]
+    game = games.get(chat_id)
 
-    if query.data == 'join_game':
-        if len(game['players']) == 1:
+    if not game:
+        await query.answer(text="No game in progress.")
+        return
+
+    user = query.from_user
+
+    if query.data == 'join':
+        if len(game['players']) < 2:
             game['players'].append(user.id)
-            game['player_choices'][user.id] = None  # Initialize player's choice as None
-            await query.edit_message_text(text=f"{user.first_name} has joined the game as Player 2!")
-            await start_game_round(update, context)
+            game['player_choices'][user.id] = None
+            await query.edit_message_text(text=f"{user.first_name} has joined the game!")
+            if len(game['players']) == 2:
+                await start_game_round(update, context)
         else:
             await query.answer("Two players have already joined.")
     elif query.data in ['rock', 'paper', 'scissors']:
         if user.id in game['player_choices']:
-            game['player_choices'][user.id] = query.data  # Save the player's choice
-            await query.answer()
+            game['player_choices'][user.id] = query.data
+            await query.answer(text=f"You selected {query.data}")
             await query.edit_message_text(text=f"You selected {query.data}")
 
-            # Check if both players have made their choices
             if None not in game['player_choices'].values():
                 await determine_winner(update, context)
+        else:
+            await query.answer("You're not a player in this game.")
 
 # Start the actual Rock-Paper-Scissors game round
 async def start_game_round(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -128,7 +144,6 @@ async def determine_winner(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     else:
         result = f"Player 2 ({choice2}) beats Player 1 ({choice1})!"
 
-    # Announce the result in the group
     await context.bot.send_message(chat_id=chat_id, text=result)
     reset_game(chat_id)
 
