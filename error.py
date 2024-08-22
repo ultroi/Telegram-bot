@@ -12,7 +12,7 @@ from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTyp
 load_dotenv(dotenv_path='.env')
 TOKEN = os.getenv("BOT_TOKEN_1")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")  # Ensure this is correctly set in .env
-GITHUB_TOKEN = "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"
+GITHUB_TOKEN = "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"
 REPO_OWNER = 'ultroi'
 REPO_NAME = 'Telegram-bot'
 FILE_PATH = 'game.py'  # Path to the file in your repo
