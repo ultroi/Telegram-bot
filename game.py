@@ -107,8 +107,7 @@ async def start_game_round(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    for player_id in game['players']:
-        await context.bot.send_message(chat_id=player_id, text="Choose Rock, Paper, or Scissors:", reply_markup=reply_markup)
+    await context.bot.send_message(chat_id=chat_id, text="Both players, please make your choice:", reply_markup=reply_markup)
 
 # Determine the winner
 async def determine_winner(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
