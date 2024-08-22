@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, CallbackContext
+from telegram.ext import ApplicationBuilder, ErrorHandler CommandHandler, CallbackQueryHandler, ContextTypes, CallbackContext
 
 # Load the .env file
 load_dotenv(dotenv_path='.env')
