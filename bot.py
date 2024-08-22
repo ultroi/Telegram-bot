@@ -339,62 +339,99 @@ async def end_round(chat_id, context: CallbackContext) -> None:
             f"Round {current_round} has ended.\n"
             f"Round {game['current_round']} has started.\n\n"
             f"Total Rounds: 5\n"
-            f"Ongoing Round: {game['current_round']}\n\n"
-            f"Players:\n"
-            + "\n".join([f"{name}: {player_points[player_id]} points" for player_id, name in player_names.items()])
-        )
-        await context.bot.send_message(chat_id, text=round_end_message)
 
-        # Assign new roles if needed
-        await assign_roles(chat_id, context)
-    else:
-        await context.bot.send_message(chat_id, text="Game has ended.")
-        reset_game(chat_id)
 
-async def assign_roles(chat_id, context: CallbackContext) -> None:
+
+           
+async def start_next_round(chat_id: int, context: CallbackContext) -> None:
     game = games.get(chat_id)
-    if not game or len(game['players']) != 4:
-        raise ValueError("The game is not properly set up.")
+    if not game:
+        return
     
-    random.shuffle(game['players'])
-    roles_assigned = dict(zip(game['players'], game['roles']))
+    # Start a new round by reassigning roles
+    await context.bot.send_message(chat_id, "Starting the next round...")
+    await assign_roles(chat_id, context)
+
+async def assign_roles(chat_id: int, context: CallbackContext) -> None:
+    game = games.get(chat_id)
+    if not game:
+        return
+    
+    roles = [RAJA, MANTRI, SIPAHI, CHOR]
+    random.shuffle(roles)
+    game['roles'] = roles_assigned = dict(zip(game['players'], roles))
+    
+    player_first_names = {player_id: (await context.bot.get_chat(player_id)).first_name for player_id in game['players']}
+    
+    roles_message = "Roles for this round:\n"
     for player_id, role in roles_assigned.items():
-        await context.bot.send_message(player_id, text=f"Your role: {role}")
-        if role == "Raja":
-            update_player_score(player_id, get_player_score(player_id) + 1000)
-        elif role == "Sipahi":
-            update_player_score(player_id, get_player_score(player_id) + 100)
-        elif role == "Mantri":
-            game['mantri_id'] = player_id
-            update_player_score(player_id, get_player_score(player_id) + 500)
-
-
-    actual_chor_id = next(
-        (player_id for player_id, role in zip(game['players'], game['roles']) if role == "Chor"), 
-        None
-    )
-    actual_chor_username = player_usernames[actual_chor_id]
-
-    # Send result to group chat
-    if guessed_player_id == actual_chor_id:
-        result_message = f"🎉 *Correct guess!* [{guessed_username}](tg://user?id={guessed_player_id}) is the Chor. 🎉"
-    else:
-        result_message = (
-            f"❌ *Wrong guess!* [{guessed_username}](tg://user?id={guessed_player_id}) is not the Chor.\n"
-            f"👤 [{actual_chor_username}](tg://user?id={actual_chor_id}) is the actual Chor."
-        )
-        update_player_score(user.id, get_player_score(user.id) - 500)
-
-    await context.bot.send_message(chat_id, text=result_message, parse_mode=ParseMode.MARKDOWN)
-
-    # Reveal all players' roles
-    roles_message = "🕵️ *Player Roles* 🕵️\n"
-    for player_id, role in zip(game['players'], game['roles']):
         roles_message += f"👤 [{player_first_names[player_id]}](tg://user?id={player_id}) - {role}\n"
-
+    
     await context.bot.send_message(chat_id, text=roles_message, parse_mode=ParseMode.MARKDOWN)
 
+    # Start the guessing phase after roles are assigned
+    await start_guessing_phase(chat_id, context)
+
+async def start_guessing_phase(chat_id: int, context: CallbackContext) -> None:
+    game = games.get(chat_id)
+    if not game:
+        return
+
+    mantri_id = next((pid for pid, role in game['roles'].items() if role == MANTRI), None)
+
+    # Create inline buttons for the Mantri to guess the Chor
+    keyboard = [
+        [InlineKeyboardButton(f"{await context.bot.get_chat(player_id).first_name}", callback_data=str(player_id))] 
+        for player_id in game['players'] if player_id != mantri_id
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await context.bot.send_message(chat_id, text="Mantri, who is the Chor? Make your guess:", reply_markup=reply_markup)
+
+    # Set a timeout for the Mantri to make a guess
+    context.job_queue.run_once(callback=guessing_timeout, when=60, context={'chat_id': chat_id, 'mantri_id': mantri_id})
+
+async def guessing_timeout(context: CallbackContext) -> None:
+    job_data = context.job.context
+    chat_id = job_data['chat_id']
+    mantri_id = job_data['mantri_id']
+    game = games.get(chat_id)
+
+    if not game or 'guessed' in game:
+        return
+
+    # Notify that the time is up and move forward
+    mantri = await context.bot.get_chat(mantri_id)
+    await context.bot.send_message(chat_id, text=f"Time is up! {mantri.first_name} didn't make a guess in time.")
+
+    # Move to the next round or end the game
     await end_round(chat_id, context)
+
+async def button(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    chat_id = query.message.chat_id
+    game = games.get(chat_id)
+
+    if not game:
+        await query.message.reply_text("No game is currently running in this chat.")
+        return
+
+    await query.answer()
+
+    guessed_player_id = int(query.data)
+    guessed_role = game['roles'][guessed_player_id]
+    mantri = await context.bot.get_chat(update.callback_query.from_user.id)
+    chor = await context.bot.get_chat(guessed_player_id)
+    
+    game['guessed'] = True  # Mark that the Mantri has made a guess
+
+    if guessed_role == CHOR:
+        await query.edit_message_text(f"Correct! {chor.first_name} is the Chor! 🎉")
+    else:
+        await query.edit_message_text(f"Wrong guess! {chor.first_name} is not the Chor. 😔")
+
+    await announce_final_result(context, chat_id, mantri, chor)
+    reset_game(chat_id)
 
 async def end_round(chat_id: int, context: CallbackContext) -> None:
     game = games.get(chat_id)
@@ -407,58 +444,23 @@ async def end_round(chat_id: int, context: CallbackContext) -> None:
     else:
         await start_next_round(chat_id, context)
 
-
-async def guess(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id not in players:
-        await update.message.reply_text("You are not in the game! Use /join to participate.")
+async def announce_final_result(context: CallbackContext, chat_id: int, mantri, chor) -> None:
+    game = games.get(chat_id)
+    if not game:
         return
-
-    if player_roles.get(update.message.from_user.id) != "Mantri 🤵":
-        await update.message.reply_text("Only the Mantri can guess!")
-        return
-
-    # Creating inline buttons for the Mantri to guess
-    keyboard = [
-        [InlineKeyboardButton(f"{await context.bot.get_chat(player_id).first_name}", callback_data=str(player_id))] for player_id in players if player_roles[player_id] != "Mantri 🤵"
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await update.message.reply_text("Who is the Chor? Make your guess:", reply_markup=reply_markup)
-
-# Callback handler for the guess buttons
-async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    
-    guessed_player_id = int(query.data)
-    guessed_role = player_roles[guessed_player_id]
-    mantri = await context.bot.get_chat(update.callback_query.from_user.id)
-    chor = await context.bot.get_chat(guessed_player_id)
-    
-    if guessed_role == "Chor 🕵️‍♂️":
-        await query.edit_message_text(f"Correct! {chor.first_name} is the Chor! 🎉")
-    else:
-        await query.edit_message_text(f"Wrong guess! {chor.first_name} is not the Chor. 😔")
-
-    await announce_final_result(context, mantri, chor)
-    reset_game()
-
-# Function to announce the final result in the group chat
-async def announce_final_result(context: ContextTypes.DEFAULT_TYPE, mantri, chor):
     result = f"The game has ended.\n\n"
     result += f"Mantri ({mantri.first_name}) guessed that Chor is {chor.first_name}.\n"
-    result += f"Correct Answer: {player_roles[chor.id] == 'Chor 🕵️‍♂️'}.\n"
+    result += f"Correct Answer: {game['roles'][chor.id] == CHOR}.\n"
     
-    await context.bot.send_message(context.chat_data['chat_id'], result)
+    await context.bot.send_message(chat_id, result)
 
-async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.message.from_user
-    if user.id in players:
-        players.remove(user.id)
-        await update.message.reply_text(f"{user.first_name} left the game.")
-        await end_game_due_to_leave(context, user)
-    else:
-        await update.message.reply_text("You are not in the game!")
+async def reset_game(chat_id: int) -> None:
+    if chat_id in games:
+        del games[chat_id]
+        # Optionally reset game state in a persistent storage if implemented
+
+# Existing code for handling the /gstats command and other functionalities remains unchanged
 
 # Function to handle the game ending when someone leaves
 async def end_game_due_to_leave(context: ContextTypes.DEFAULT_TYPE, user):
