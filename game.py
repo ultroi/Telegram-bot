@@ -31,36 +31,38 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(instructions)
 
 # Start a new game when /startgame is called
-async def start_game(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat_id = update.effective_chat.id
-
-    if not in_group_chat(update):
-        await update.message.reply_text("This game can only be played in a group chat.")
+async def start_game(update: Update, context: CallbackContext):
+    global game_started
+    if game_started:
+        await update.message.reply_text("A game is already in progress.")
         return
 
-    # Initialize the game state for the chat if it doesn't exist
-    if chat_id not in games:
-        games[chat_id] = {
-            'players': [],
-            'player_choices': {}
-        }
+    keyboard = [[InlineKeyboardButton("Join the Game", callback_data='join')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text('Click "Join the Game" to participate:', reply_markup=reply_markup)
 
-    game = games[chat_id]
+async def join_game(update: Update, context: CallbackContext):
+    global game_started
+    query = update.callback_query
+    player_id = query.from_user.id
 
-    if len(game['players']) == 0:
-        user = update.message.from_user
-        game['players'].append(user.id)
-        game['player_choices'][user.id] = None  # Initialize player's choice as None
-        await update.message.reply_text(f"{user.first_name} has started the game as Player 1!")
+    if player_id in players:
+        await query.answer(text="You have already joined.")
+        return
 
-        # Provide a "Join" button for the second player
-        join_button = [
-            [InlineKeyboardButton("Join the Game", callback_data='join_game')]
-        ]
-        reply_markup = InlineKeyboardMarkup(join_button)
-        await update.message.reply_text("Another player can join by clicking the button below:", reply_markup=reply_markup)
-    else:
-        await update.message.reply_text("A game is already in progress. Please wait for it to finish before starting a new one.")
+    if len(players) >= 2:
+        await query.answer(text="The game is already full.")
+        return
+
+    # Add player to the game
+    players[player_id] = 'joined'
+    await query.answer(text="You have joined the game!")
+
+    if len(players) == 2:
+        game_started = True
+        await query.message.reply_text("Both players have joined. The game is starting!")
+        # Optionally, you can send instructions or start the game directly here
+
 
 # Handle button clicks (join and choice selection)
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
