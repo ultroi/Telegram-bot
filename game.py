@@ -33,39 +33,35 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     "Good luck and have fun! 🍀")
     await update.message.reply_text(instructions)
 
+
 # Start a new game when /startgame is called
 async def start_game(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    global game_started
     chat_id = update.effective_chat.id
-
-    if chat_id in games and games[chat_id]['started']:
+    if chat_id in games and len(games[chat_id]['players']) == 2:
         await update.message.reply_text("A game is already in progress.")
         return
 
-    games[chat_id] = {
-        'players': [update.message.from_user.id],
-        'player_choices': {},
-        'started': False
-    }
-
     keyboard = [[InlineKeyboardButton("Join the Game", callback_data='join')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text('🕹️ A new game is about to begin!\n\n'
-                                    'You\'re Player 1. To let others join, click the button below:\n\n'
-                                    '[Join the Game]\n\n'
-                                    'Once Player 2 joins, the game will start, and you\'ll get to choose Rock, Paper, or Scissors. 🌟',
-                                    reply_markup=reply_markup)
+    await update.message.reply_text('Click "Join the Game" to participate:', reply_markup=reply_markup)
+
+    # Initialize game data for the chat if not already initialized
+    if chat_id not in games:
+        games[chat_id] = {
+            'players': [],
+            'player_choices': {}
+        }
+    
 
 async def join_game(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     player_id = query.from_user.id
-    chat_id = update.effective_chat.id
+    chat_id = query.message.chat_id
 
-    if chat_id not in games:
-        await query.answer(text="No game is currently available to join.")
+    game = games.get(chat_id, None)
+    if not game:
+        await query.answer(text="No game is active in this chat.")
         return
-
-    game = games[chat_id]
 
     if player_id in game['players']:
         await query.answer(text="You have already joined.")
@@ -78,16 +74,11 @@ async def join_game(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Add player to the game
     game['players'].append(player_id)
     game['player_choices'][player_id] = None  # Initialize player's choice as None
+    await query.answer(text="You have joined the game!")
 
     if len(game['players']) == 2:
-        game['started'] = True
-        await query.message.reply_text("🎉 You've joined the game as Player 2!\n\n"
-                                      "Both players, please make your choices using the buttons below:\n\n"
-                                      "[Rock] [Paper] [Scissors]\n\n"
-                                      "May the best player win! 🏆")
+        await query.message.reply_text("Both players have joined. The game is starting!")
         await start_game_round(update, context)
-    else:
-        await query.answer(text="You have joined the game!")
 
 # Handle button clicks (choice selection)
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -108,7 +99,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if query.data in ['rock', 'paper', 'scissors']:
         game['player_choices'][user.id] = query.data
         await query.answer()
-        await query.edit_message_text(text=f"You selected {query.data}!")
+        await query.edit_message_text(text=f"You selected {query.data }!")
 
         # Check if both players have made their choices
         if None not in game['player_choices'].values():
