@@ -325,8 +325,6 @@ async def start_next_round(chat_id: int, context: CallbackContext):
         await announce_final_results(chat_id, context)
 
 
-
-
 async def end_round(chat_id, context: CallbackContext) -> None:
     game = games.get(chat_id)
     if not game:
@@ -345,7 +343,16 @@ async def end_round(chat_id, context: CallbackContext) -> None:
             f"Round {current_round} has ended.\n"
             f"Round {game['current_round']} has started.\n\n"
             f"Total Rounds: 5\n"
+            f"Players:\n"
+        )
+        
+        for player_id, name in player_names.items():
+            round_end_message += f"{name}: {player_points[player_id]} points\n"
 
+        await context.bot.send_message(chat_id=chat_id, text=round_end_message)
+    else:
+        # Logic for ending the game after the last round
+        await end_game(chat_id, context)
 
 
            
