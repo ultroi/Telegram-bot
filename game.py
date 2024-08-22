@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ApplicationBuilder, ErrorHandler, CommandHandler, CallbackQueryHandler, ContextTypes, CallbackContext
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, CallbackContext
 
 # Load the .env file
 load_dotenv(dotenv_path='.env')
@@ -174,13 +174,10 @@ def reset_game(chat_id: int) -> None:
     if chat_id in games:
         del games[chat_id]
 
-
-async def error_handler(update: Update, context: CallbackContext):
-    # Log the error
-    error_message = f'Update {update} caused error {context.error}'
-    logging.error(error_message)
-    # Notify the group chat about the error
-    send_error_notification(error_message)
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    error_message = f"An error occurred: {context.error}"
+    # Log the error or notify it in the group chat
+    await context.bot.send_message(chat_id='-1002201661092', text=error_message)
 
 
 def main() -> None:
