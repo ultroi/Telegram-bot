@@ -24,6 +24,20 @@ if not TOKEN or not GITHUB_TOKEN:
 # GitHub API URL
 GITHUB_API_URL = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}"
 
+async def handle_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    code = update.message.text  # Get the pasted code from the message
+    with open("pasted_code.py", "w") as file:
+        file.write(code)  # Save the code to a file
+
+    # Run the code
+    result = subprocess.run(['python3', 'pasted_code.py'], capture_output=True, text=True)
+
+    # Send back the result
+    if result.returncode != 0:
+        await update.message.reply_text(f"Execution failed:\n{result.stderr}")
+    else:
+        await update.message.reply_text(f"Execution result:\n{result.stdout}")
+
 def fetch_file_content() -> str:
     headers = {'Authorization': f'token {GITHUB_TOKEN}'}
     response = requests.get(f"{GITHUB_API_URL}/contents/{FILE_PATH}", headers=headers)
