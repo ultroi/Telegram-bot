@@ -29,26 +29,24 @@ if not TOKEN or not GITHUB_TOKEN:
 GITHUB_API_URL = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}"
 
 async def handle_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    logging.info(f"Received a message in chat: {update.effective_chat.id}")
-    code = update.message.text  # Get the pasted code from the message
-    logging.info(f"Received code: {code}")
-
-    with open("pasted_code.py", "w") as file:
-        file.write(code)  # Save the code to a file
-
-    # Run the code
     try:
+        logging.info(f"Handling code from chat: {update.effective_chat.id}, user: {update.effective_user.id}")
+        code = update.message.text
+        logging.info(f"Code received: {code}")
+        
+        with open("pasted_code.py", "w") as file:
+            file.write(code)
+        
         result = subprocess.run(['python3', 'pasted_code.py'], capture_output=True, text=True)
         if result.returncode != 0:
             logging.error(f"Execution failed: {result.stderr}")
             await update.message.reply_text(f"Execution failed:\n{result.stderr}")
         else:
-            logging.info(f"Execution result: {result.stdout}")
+            logging.info(f"Execution succeeded: {result.stdout}")
             await update.message.reply_text(f"Execution result:\n{result.stdout}")
     except Exception as e:
-        logging.error(f"An error occurred: {e}")
-        await update.message.reply_text(f"An error occurred: {e}")
-        
+        logging.error(f"Unexpected error: {e}")
+        await update.message.reply_text(f"Unexpected error: {e}")
 
 def fetch_file_content() -> str:
     headers = {'Authorization': f'token {GITHUB_TOKEN}'}
