@@ -3,10 +3,14 @@ import requests
 import base64
 import json
 import re
+import logging 
 import subprocess
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
+
+# Setup logging
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 # Load environment variables
 load_dotenv(dotenv_path='.env')
@@ -25,18 +29,26 @@ if not TOKEN or not GITHUB_TOKEN:
 GITHUB_API_URL = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}"
 
 async def handle_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logging.info(f"Received a message in chat: {update.effective_chat.id}")
     code = update.message.text  # Get the pasted code from the message
+    logging.info(f"Received code: {code}")
+
     with open("pasted_code.py", "w") as file:
         file.write(code)  # Save the code to a file
 
     # Run the code
-    result = subprocess.run(['python3', 'pasted_code.py'], capture_output=True, text=True)
-
-    # Send back the result
-    if result.returncode != 0:
-        await update.message.reply_text(f"Execution failed:\n{result.stderr}")
-    else:
-        await update.message.reply_text(f"Execution result:\n{result.stdout}")
+    try:
+        result = subprocess.run(['python3', 'pasted_code.py'], capture_output=True, text=True)
+        if result.returncode != 0:
+            logging.error(f"Execution failed: {result.stderr}")
+            await update.message.reply_text(f"Execution failed:\n{result.stderr}")
+        else:
+            logging.info(f"Execution result: {result.stdout}")
+            await update.message.reply_text(f"Execution result:\n{result.stdout}")
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+        await update.message.reply_text(f"An error occurred: {e}")
+        
 
 def fetch_file_content() -> str:
     headers = {'Authorization': f'token {GITHUB_TOKEN}'}
@@ -111,6 +123,7 @@ def main() -> None:
     application = ApplicationBuilder().token(TOKEN).build()
     
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_code))
+    logging.info("Bot is starting...")
     
     application.run_polling()
 
