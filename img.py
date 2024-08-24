@@ -21,6 +21,7 @@ def send_welcome(message):
 # Step 2: Handle photo uploads
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
+    global last_processed_image
     bot.send_message(message.chat.id, "Processing your image. Please wait...")
     file_id = message.photo[-1].file_id
     file_info = bot.get_file(file_id)
@@ -30,7 +31,6 @@ def handle_photo(message):
     image = Image.open(io.BytesIO(downloaded_file))
 
     # Save the original image to a global variable
-    global last_processed_image
     last_processed_image = io.BytesIO()
     image.save(last_processed_image, format='PNG')
     last_processed_image.seek(0)
@@ -49,6 +49,7 @@ def handle_photo(message):
 # Step 3: Handle resolution and format choices
 @bot.callback_query_handler(func=lambda call: call.data.startswith('resolution_'))
 def handle_resolution_and_format(call):
+    global last_processed_image
     resolution, format = call.data.split('_')[1], call.data.split('_')[2]
 
     if last_processed_image:
@@ -64,7 +65,6 @@ def handle_resolution_and_format(call):
             image = image.resize((3840, 2160), Image.ANTIALIAS)
 
         # Save the resized image
-        global last_processed_image
         last_processed_image = io.BytesIO()
         image.save(last_processed_image, format=format.upper())
         last_processed_image.seek(0)
@@ -84,6 +84,7 @@ def handle_resolution_and_format(call):
 # Step 4: Handle enhancement options
 @bot.callback_query_handler(func=lambda call: call.data.startswith('enhance_'))
 def handle_enhancement(call):
+    global last_processed_image
     enhancement_type = call.data.split('_')[1]
 
     if last_processed_image:
@@ -107,7 +108,6 @@ def handle_enhancement(call):
             image = enhancer.enhance(1.5)  # Adjust saturation factor as needed
 
         # Save the enhanced image to a global variable
-        global last_processed_image
         last_processed_image = io.BytesIO()
         image.save(last_processed_image, format='PNG')
         last_processed_image.seek(0)
@@ -126,6 +126,7 @@ def handle_enhancement(call):
 # Step 5: Handle output format and method
 @bot.callback_query_handler(func=lambda call: call.data.startswith('send_') or call.data.startswith('convert_'))
 def handle_output_choice(call):
+    global last_processed_image
     choice = call.data.split('_')[1]
     
     if last_processed_image:
