@@ -82,7 +82,9 @@ def handle_resolution(call):
 def handle_conversion(call):
     global last_processed_image
     format = call.data.split('_')[1]
-
+    if format == 'jpg':
+        format = 'JPEG' # Correct the format string to 'JPEG'
+    
     if last_processed_image:
         last_processed_image.seek(0)
         image = Image.open(last_processed_image)
