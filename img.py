@@ -132,6 +132,11 @@ def handle_enhancement(call):
         image_format = image.format if image.format in ['JPEG', 'PNG'] else 'PNG'
         image.save(last_processed_image, format=image_format)
         last_processed_image.seek(0)
+        
+        # Edit message to ask if user wants to continue or send the image
+        markup = types.InlineKeyboardMarkup()
+        btn_next = types.InlineKeyboardButton("Next", callback_data="next")
+        markup.add(btn_next)
 
         # Allow multiple enhancements
         bot.answer_callback_query(call.id, "Enhancement applied! Choose another or proceed to sending.")
