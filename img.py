@@ -58,11 +58,11 @@ def handle_resolution_and_format(call):
 
         # Apply resolution change
         if resolution == '720p':
-            image = image.resize((1280, 720), Image.ANTIALIAS)
+            image = image.resize((1280, 720), Image.Resampling.LANCZOS)
         elif resolution == '1080p':
-            image = image.resize((1920, 1080), Image.ANTIALIAS)
+            image = image.resize((1920, 1080), Image.Resampling.LANCZOS)
         elif resolution == '4k':
-            image = image.resize((3840, 2160), Image.ANTIALIAS)
+            image = image.resize((3840, 2160), Image.Resampling.LANCZOS)
 
         # Save the resized image
         last_processed_image = io.BytesIO()
