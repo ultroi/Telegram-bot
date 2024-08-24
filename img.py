@@ -34,12 +34,12 @@ def handle_photo(message):
 
     # Save the original image to a global variable
     last_processed_image = io.BytesIO()
-    image.save(last_processed_image, format='PNG')
+    image.save(last_processed_image, format='PNG')  # Default to PNG initially
     last_processed_image.seek(0)
+    current_format = 'PNG'  # Set the default format
 
     # Reset the settings
     current_resolution = None
-    current_format = None
     enhancements_applied = []
 
     # Ask user for resolution and format
@@ -157,7 +157,7 @@ def handle_enhancement(call):
 
         # Save the enhanced image
         last_processed_image = io.BytesIO()
-        image.save(last_processed_image, format=image.format)
+        image.save(last_processed_image, format=current_format)
         last_processed_image.seek(0)
         enhancements_applied.append(enhancement_type.capitalize())
 
