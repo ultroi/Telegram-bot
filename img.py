@@ -3,12 +3,14 @@ from telebot import types
 from PIL import Image, ImageEnhance
 import io
 
-API_TOKEN = '7500257227:AAHDOrxT3SjzvdIbXT1psVmT4kAnk-v-TZw'
+API_TOKEN = 'YOUR_TELEGRAM_BOT_API_TOKEN'
 bot = telebot.TeleBot(API_TOKEN)
 
-# Global variable to store the last processed image and original photo ID
+# Global variables to store the last processed image and settings
 last_processed_image = None
-original_photo_message_id = None
+current_resolution = None
+current_format = None
+enhancements_applied = []
 
 # Step 1: Start command
 @bot.message_handler(commands=['start'])
@@ -21,9 +23,8 @@ def send_welcome(message):
 # Step 2: Handle photo uploads
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
-    global last_processed_image, original_photo_message_id
+    global last_processed_image, current_resolution, current_format, enhancements_applied
     bot.send_message(message.chat.id, "Processing your image. Please wait...")
-    
     file_id = message.photo[-1].file_id
     file_info = bot.get_file(file_id)
     downloaded_file = bot.download_file(file_info.file_path)
@@ -35,9 +36,11 @@ def handle_photo(message):
     last_processed_image = io.BytesIO()
     image.save(last_processed_image, format='PNG')
     last_processed_image.seek(0)
-    
-    # Store the original photo message ID for deletion
-    original_photo_message_id = message.message_id
+
+    # Reset the settings
+    current_resolution = None
+    current_format = None
+    enhancements_applied = []
 
     # Ask user for resolution and format
     markup = types.InlineKeyboardMarkup()
@@ -50,7 +53,7 @@ def handle_photo(message):
 # Step 3: Handle resolution choices and ask for format
 @bot.callback_query_handler(func=lambda call: call.data.startswith('resolution_'))
 def handle_resolution(call):
-    global last_processed_image
+    global last_processed_image, current_resolution
     resolution = call.data.split('_')[1]
 
     if last_processed_image:
@@ -69,22 +72,29 @@ def handle_resolution(call):
         last_processed_image = io.BytesIO()
         image.save(last_processed_image, format='PNG')
         last_processed_image.seek(0)
+        current_resolution = resolution
 
-        # Edit the previous message to ask for format conversion
+        # Ask for format conversion
         markup = types.InlineKeyboardMarkup()
         btn_jpg = types.InlineKeyboardButton("Convert to JPG", callback_data="convert_jpg")
         btn_png = types.InlineKeyboardButton("Convert to PNG", callback_data="convert_png")
+        btn_back = types.InlineKeyboardButton("Back", callback_data="back_resolution")
         markup.add(btn_jpg, btn_png)
+        markup.add(btn_back)
         bot.edit_message_text("Choose the output format:", call.message.chat.id, call.message.message_id, reply_markup=markup)
 
 # Step 4: Handle format conversion and ask for enhancements
-@bot.callback_query_handler(func=lambda call: call.data.startswith('convert_'))
+@bot.callback_query_handler(func=lambda call: call.data.startswith('convert_') or call.data == 'back_resolution')
 def handle_conversion(call):
-    global last_processed_image
+    global last_processed_image, current_format
+
+    if call.data == 'back_resolution':
+        # Go back to the resolution step
+        handle_photo(call.message)
+        return
+
     format = call.data.split('_')[1]
-    if format == 'jpg':
-        format = 'JPEG' # Correct the format string to 'JPEG'
-    
+
     if last_processed_image:
         last_processed_image.seek(0)
         image = Image.open(last_processed_image)
@@ -93,20 +103,36 @@ def handle_conversion(call):
         last_processed_image = io.BytesIO()
         image.save(last_processed_image, format=format.upper())
         last_processed_image.seek(0)
+        current_format = format
 
-        # Edit the message to ask for enhancements
+        # Ask for enhancements
         markup = types.InlineKeyboardMarkup()
         btn_brightness = types.InlineKeyboardButton("Enhance Brightness", callback_data="enhance_brightness")
         btn_contrast = types.InlineKeyboardButton("Enhance Contrast", callback_data="enhance_contrast")
         btn_sharpness = types.InlineKeyboardButton("Enhance Sharpness", callback_data="enhance_sharpness")
         btn_color = types.InlineKeyboardButton("Enhance Color", callback_data="enhance_color")
+        btn_next = types.InlineKeyboardButton("Next", callback_data="next_enhancement")
+        btn_back = types.InlineKeyboardButton("Back", callback_data="back_format")
         markup.add(btn_brightness, btn_contrast, btn_sharpness, btn_color)
+        markup.add(btn_next)
+        markup.add(btn_back)
         bot.edit_message_text("Choose enhancement options (You can choose multiple):", call.message.chat.id, call.message.message_id, reply_markup=markup)
 
 # Step 5: Handle enhancement options (allow multiple selections)
-@bot.callback_query_handler(func=lambda call: call.data.startswith('enhance_'))
+@bot.callback_query_handler(func=lambda call: call.data.startswith('enhance_') or call.data in ['next_enhancement', 'back_format'])
 def handle_enhancement(call):
-    global last_processed_image
+    global last_processed_image, enhancements_applied
+
+    if call.data == 'back_format':
+        # Go back to the format selection step
+        handle_resolution(call)
+        return
+
+    if call.data == 'next_enhancement':
+        # Proceed to the next step
+        show_summary(call.message)
+        return
+
     enhancement_type = call.data.split('_')[1]
 
     if last_processed_image:
@@ -127,27 +153,35 @@ def handle_enhancement(call):
             enhancer = ImageEnhance.Color(image)
             image = enhancer.enhance(1.5)
 
-        # Save the enhanced image with a specified format (PNG or JPEG)
+        # Save the enhanced image
         last_processed_image = io.BytesIO()
-        image_format = image.format if image.format in ['JPEG', 'PNG'] else 'PNG'
-        image.save(last_processed_image, format=image_format)
+        image.save(last_processed_image, format=image.format)
         last_processed_image.seek(0)
-        
-        # Edit message to ask if user wants to continue or send the image
-        markup = types.InlineKeyboardMarkup()
-        btn_next = types.InlineKeyboardButton("Next", callback_data="next")
-        markup.add(btn_next)
+        enhancements_applied.append(enhancement_type.capitalize())
 
-        # Allow multiple enhancements
-        bot.answer_callback_query(call.id, "Enhancement applied! Choose another or proceed to sending.")
-    else:
-        bot.send_message(call.message.chat.id, "No image processed yet. Please upload an image first.")
+        bot.answer_callback_query(call.id, f"{enhancement_type.capitalize()} enhancement applied! Choose another or proceed to sending.")
 
+# Step 6: Final step - Show summary and choose sending method
+def show_summary(message):
+    summary = f"Resolution: {current_resolution}\nFormat: {current_format}\nEnhancements: {', '.join(enhancements_applied)}"
+    
+    markup = types.InlineKeyboardMarkup()
+    btn_send_photo = types.InlineKeyboardButton("Send as Photo", callback_data="send_photo")
+    btn_send_doc = types.InlineKeyboardButton("Send as Document", callback_data="send_doc")
+    btn_back = types.InlineKeyboardButton("Back", callback_data="back_enhancement")
+    markup.add(btn_send_photo, btn_send_doc)
+    markup.add(btn_back)
+    
+    bot.send_message(message.chat.id, f"Summary:\n{summary}\nChoose how to send the image:", reply_markup=markup)
 
-# Step 6: Final step - Choose sending method
-@bot.callback_query_handler(func=lambda call: call.data in ['send_photo', 'send_doc'])
+@bot.callback_query_handler(func=lambda call: call.data in ['send_photo', 'send_doc', 'back_enhancement'])
 def handle_output_choice(call):
-    global last_processed_image, original_photo_message_id
+    global last_processed_image
+
+    if call.data == 'back_enhancement':
+        # Go back to the enhancement selection step
+        handle_conversion(call)
+        return
 
     if last_processed_image:
         last_processed_image.seek(0)
@@ -156,11 +190,6 @@ def handle_output_choice(call):
             bot.send_photo(call.message.chat.id, photo=last_processed_image, caption="Here is your processed image.")
         elif call.data == 'send_doc':
             bot.send_document(call.message.chat.id, document=last_processed_image, caption="Here is your processed image.")
-        
-        # Delete the original photo message
-        if original_photo_message_id:
-            bot.delete_message(call.message.chat.id, original_photo_message_id)
-
     else:
         bot.send_message(call.message.chat.id, "No image processed yet. Please upload an image first.")
 
