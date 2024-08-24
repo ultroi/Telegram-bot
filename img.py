@@ -10,9 +10,6 @@ bot = telebot.TeleBot(API_TOKEN)
 # Global variable to store the last processed image
 last_processed_image = None
 
-
-image = image.resize((1920, 1080), Image.Resampling.LANCZOS)
-
 # Step 1: Start command
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
