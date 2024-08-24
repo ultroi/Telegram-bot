@@ -64,9 +64,20 @@ def handle_resolution_and_format(call):
         elif resolution == '4k':
             image = image.resize((3840, 2160), Image.Resampling.LANCZOS)
 
+        # Check if the format is valid
+        valid_formats = ['PNG', 'JPG', 'JPEG']
+        if format.upper() not in valid_formats:
+            bot.send_message(call.message.chat.id, f"Invalid format: {format.upper()}. Please choose PNG or JPG.")
+            return
+
         # Save the resized image
         last_processed_image = io.BytesIO()
-        image.save(last_processed_image, format=format.upper())
+        try:
+            image.save(last_processed_image, format=format.upper())
+        except KeyError:
+            bot.send_message(call.message.chat.id, f"Error saving image in format: {format.upper()}. Please try again.")
+            return
+
         last_processed_image.seek(0)
 
         # Ask for enhancements
@@ -80,6 +91,7 @@ def handle_resolution_and_format(call):
         bot.send_message(call.message.chat.id, "Choose an enhancement option:", reply_markup=markup)
     else:
         bot.send_message(call.message.chat.id, "No image processed yet. Please upload an image first.")
+
 
 # Step 4: Handle enhancement options
 @bot.callback_query_handler(func=lambda call: call.data.startswith('enhance_'))
