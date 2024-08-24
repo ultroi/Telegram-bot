@@ -201,7 +201,7 @@ def show_summary(message):
     
     bot.send_message(message.chat.id, f"Summary:\n{summary}\nChoose how to send the image:", reply_markup=markup)
 
-@bot.callback_query_handler(func=lambda call: call.data in ['send_photo', 'send_doc', 'back_enhancement'])
+@bot.callback_query_handler(func=lambda call: call.data in ['next_enhancement', 'back_enhancement'])
 def handle_output_choice(call):
     global last_processed_image
 
@@ -213,16 +213,10 @@ def handle_output_choice(call):
     if last_processed_image:
         last_processed_image.seek(0)
         
-        try:
-            if call.data == 'send_photo':
-                bot.send_photo(call.message.chat.id, photo=last_processed_image, caption="Here is your processed image.")
-            elif call.data == 'send_doc':
-                bot.send_document(call.message.chat.id, document=last_processed_image, caption="Here is your processed image.")
-        except Exception as e:
-            bot.send_message(call.message.chat.id, f"Error while sending the image: {e}")
+        # Always send as photo
+        bot.send_photo(call.message.chat.id, photo=last_processed_image, caption="Here is your processed image.")
     else:
         bot.send_message(call.message.chat.id, "No image processed yet. Please upload an image first.")
-
 
 # Run the bot
 bot.polling()
