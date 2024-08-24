@@ -127,17 +127,17 @@ def handle_enhancement(call):
             enhancer = ImageEnhance.Color(image)
             image = enhancer.enhance(1.5)
 
-        # Save the enhanced image
+        # Save the enhanced image with a specified format (PNG or JPEG)
         last_processed_image = io.BytesIO()
-        image.save(last_processed_image, format=image.format)
+        image_format = image.format if image.format in ['JPEG', 'PNG'] else 'PNG'
+        image.save(last_processed_image, format=image_format)
         last_processed_image.seek(0)
 
         # Allow multiple enhancements
         bot.answer_callback_query(call.id, "Enhancement applied! Choose another or proceed to sending.")
-        return  # Keep the options open for further enhancement choices
-
     else:
         bot.send_message(call.message.chat.id, "No image processed yet. Please upload an image first.")
+
 
 # Step 6: Final step - Choose sending method
 @bot.callback_query_handler(func=lambda call: call.data in ['send_photo', 'send_doc'])
