@@ -3,6 +3,7 @@ from telebot import types
 from PIL import Image, ImageEnhance
 import io
 
+# Replace 'YOUR_TELEGRAM_BOT_API_TOKEN' with your actual bot token
 API_TOKEN = '7500257227:AAHDOrxT3SjzvdIbXT1psVmT4kAnk-v-TZw'
 bot = telebot.TeleBot(API_TOKEN)
 
