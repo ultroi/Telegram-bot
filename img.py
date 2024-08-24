@@ -93,7 +93,9 @@ def handle_conversion(call):
         handle_photo(call.message)
         return
 
-    format = call.data.split('_')[1]
+    format = call.data.split('_')[1].upper()
+    if format == 'JPG':
+        format = 'JPEG'
 
     if last_processed_image:
         last_processed_image.seek(0)
@@ -101,7 +103,7 @@ def handle_conversion(call):
         
         # Save the image in the selected format
         last_processed_image = io.BytesIO()
-        image.save(last_processed_image, format=format.upper())
+        image.save(last_processed_image, format=format)
         last_processed_image.seek(0)
         current_format = format
 
