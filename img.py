@@ -3,7 +3,7 @@ from telebot import types
 from PIL import Image, ImageEnhance
 import io
 
-API_TOKEN = 'YOUR_TELEGRAM_BOT_API_TOKEN'
+API_TOKEN = '7500257227:AAHDOrxT3SjzvdIbXT1psVmT4kAnk-v-TZw'
 bot = telebot.TeleBot(API_TOKEN)
 
 # Global variable to store the last processed image and original photo ID
