@@ -1,7 +1,8 @@
 import telebot
 from telebot import types
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageFilter
 import io
+import numpy as np
 
 API_TOKEN = '7500257227:AAHDOrxT3SjzvdIbXT1psVmT4kAnk-v-TZw'
 bot = telebot.TeleBot(API_TOKEN)
@@ -54,19 +55,24 @@ def handle_photo(message):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('resolution_'))
 def handle_resolution(call):
     global last_processed_image, current_resolution
+    
     resolution = call.data.split('_')[1]
 
     if last_processed_image:
         last_processed_image.seek(0)
         image = Image.open(last_processed_image)
 
-        # Apply resolution change
-        if resolution == '720p':
-            image = image.resize((1280, 720), Image.Resampling.LANCZOS)
-        elif resolution == '1080p':
-            image = image.resize((1920, 1080), Image.Resampling.LANCZOS)
-        elif resolution == '4k':
-            image = image.resize((3840, 2160), Image.Resampling.LANCZOS)
+        # Apply resolution change with safety checks
+        try:
+            if resolution == '720p':
+                image = image.resize((1280, 720), Image.Resampling.LANCZOS)
+            elif resolution == '1080p':
+                image = image.resize((1920, 1080), Image.Resampling.LANCZOS)
+            elif resolution == '4k':
+                image = image.resize((3840, 2160), Image.Resampling.LANCZOS)
+        except Exception as e:
+            bot.send_message(call.message.chat.id, f"Error during resolution change: {e}")
+            return
 
         # Save the resized image
         last_processed_image = io.BytesIO()
@@ -101,11 +107,15 @@ def handle_conversion(call):
         last_processed_image.seek(0)
         image = Image.open(last_processed_image)
         
-        # Save the image in the selected format
-        last_processed_image = io.BytesIO()
-        image.save(last_processed_image, format=format)
-        last_processed_image.seek(0)
-        current_format = format
+        try:
+            # Save the image in the selected format
+            last_processed_image = io.BytesIO()
+            image.save(last_processed_image, format=format)
+            last_processed_image.seek(0)
+            current_format = format
+        except Exception as e:
+            bot.send_message(call.message.chat.id, f"Error during format conversion: {e}")
+            return
 
         # Ask for enhancements
         markup = types.InlineKeyboardMarkup()
@@ -120,6 +130,7 @@ def handle_conversion(call):
         markup.add(btn_back)
         bot.edit_message_text("Choose enhancement options (You can choose multiple):", call.message.chat.id, call.message.message_id, reply_markup=markup)
 
+
 # Step 5: Handle enhancement options (allow multiple selections)
 @bot.callback_query_handler(func=lambda call: call.data.startswith('enhance_') or call.data in ['next_enhancement', 'back_format'])
 def handle_enhancement(call):
@@ -127,7 +138,7 @@ def handle_enhancement(call):
 
     if call.data == 'back_format':
         # Go back to the format selection step
-        handle_resolution(call)
+        handle_conversion(call)
         return
 
     if call.data == 'next_enhancement':
@@ -141,19 +152,33 @@ def handle_enhancement(call):
         last_processed_image.seek(0)
         image = Image.open(last_processed_image)
 
-        # Apply selected enhancement
+        # Inform the user that processing might take a while
+        bot.send_message(call.message.chat.id, "Enhancing image quality, this may take a few moments...")
+
+        # Apply selected enhancement with increased intensity and multi-pass
         if enhancement_type == 'brightness':
             enhancer = ImageEnhance.Brightness(image)
-            image = enhancer.enhance(1.5)
+            for _ in range(2):  # Multi-pass enhancement
+                image = enhancer.enhance(1.5)
         elif enhancement_type == 'contrast':
             enhancer = ImageEnhance.Contrast(image)
-            image = enhancer.enhance(1.5)
+            for _ in range(2):
+                image = enhancer.enhance(1.5)
         elif enhancement_type == 'sharpness':
             enhancer = ImageEnhance.Sharpness(image)
-            image = enhancer.enhance(2.0)
+            for _ in range(3):
+                image = enhancer.enhance(1.7)
         elif enhancement_type == 'color':
             enhancer = ImageEnhance.Color(image)
-            image = enhancer.enhance(1.5)
+            for _ in range(2):
+                image = enhancer.enhance(1.5)
+
+        # Apply advanced noise reduction (bilateral filter simulation)
+        image = image.filter(ImageFilter.MedianFilter(size=3))  # Basic noise reduction
+        image = image.filter(ImageFilter.SMOOTH_MORE)  # Additional smoothing
+
+        # Optionally, upscale the image using Lanczos (higher-quality scaling)
+        image = image.resize((image.width * 2, image.height * 2), Image.Resampling.LANCZOS)
 
         # Save the enhanced image
         last_processed_image = io.BytesIO()
