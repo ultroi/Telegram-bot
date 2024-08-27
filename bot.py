@@ -24,9 +24,12 @@ def generate_game_id():
 def start(message):
     bot.send_message(message.chat.id, "Welcome to the Rock-Paper-Scissors bot! Type /play to start a game.")
 
-@bot.message_handler(commands=['play'])
+import threading
+
+game_data = {}
+
 def play(message):
-    if message.chat.type not in ['group', 'supergroup']:
+    if message.chat.type != 'group':
         bot.send_message(message.chat.id, "This bot only works in groups.")
         return
 
@@ -37,29 +40,41 @@ def play(message):
 
     # Automatically add the user who started the game
     game_data[message.chat.id] = {
-        'players': 1, 
-        'bot_choice': None, 
-        'timeout': time.time() + round_timeout, 
-        'best_of': best_of, 
-        'scores': {}, 
+        'players': 1,
+        'bot_choice': None,
+        'timeout': time.time() + round_timeout,
+        'best_of': best_of,
+        'scores': {},
         'choices': {message.from_user.id: None},  # Initialize with the first player
         'joined_players': [message.from_user.id],  # Track joined players
         'game_id': generate_game_id(),
-        'auto_start': threading.Timer(auto_start_time, auto_start_game, args=[message.chat.id])
     }
 
     bot.send_message(message.chat.id, f"{message.from_user.first_name} has automatically joined the game.")
 
     # Start the auto-start timer
-    game_data[message.chat.id]['auto_start'].start()
+    start_auto_start_timer(message.chat.id)
 
+
+def start_auto_start_timer(chat_id):
+    # Cancel existing timer if it's already running
+    if 'auto_start' in game_data[chat_id]:
+        game_data[chat_id]['auto_start'].cancel()
+
+    # Create and start a new timer
+    game_data[chat_id]['auto_start'] = threading.Timer(auto_start_time, auto_start_game, args=[chat_id])
+    game_data[chat_id]['auto_start'].start()
+
+def auto_start_game(chat_id):
+    bot.send_message(chat_id, "The game is starting automatically because the timer expired!")
+    start_game(chat_id)
 
 def auto_start_game(chat_id):
     if chat_id in game_data:
         if game_data[chat_id]['player s'] >= min_players:
             start_game(chat_id)
         else:
-            bot.send_message(chat_id, "Not enough players to start the game. Game canceled.")
+            bot.send_message(chat_id, "Not enough  players to start the game. Game canceled.")
             del game_data[chat_id]
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('join_game'))
