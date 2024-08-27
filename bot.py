@@ -5,7 +5,7 @@ import random
 import uuid
 import threading
 
-bot = telebot.TeleBot('7500257227:AAHDOrxT3SjzvdIbXT1psVmT4kAnk-v-TZw')
+bot = telebot.TeleBot('7441832203:AAFpcfYbphZQ9cCFdxsHTABK9r4E18b4PiM')
 
 game_data = {}
 
