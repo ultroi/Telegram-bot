@@ -24,10 +24,6 @@ def generate_game_id():
 def start(message):
     bot.send_message(message.chat.id, "Welcome to the Rock-Paper-Scissors bot! Type /play to start a game.")
 
-import threading
-
-game_data = {}
-
 def play(message):
     if message.chat.type != 'group':
         bot.send_message(message.chat.id, "This bot only works in groups.")
@@ -55,7 +51,6 @@ def play(message):
     # Start the auto-start timer
     start_auto_start_timer(message.chat.id)
 
-
 def start_auto_start_timer(chat_id):
     # Cancel existing timer if it's already running
     if 'auto_start' in game_data[chat_id]:
@@ -66,15 +61,11 @@ def start_auto_start_timer(chat_id):
     game_data[chat_id]['auto_start'].start()
 
 def auto_start_game(chat_id):
-    bot.send_message(chat_id, "The game is starting automatically because the timer expired!")
-    start_game(chat_id)
-
-def auto_start_game(chat_id):
     if chat_id in game_data:
-        if game_data[chat_id]['player s'] >= min_players:
+        if game_data[chat_id]['players'] >= min_players:
             start_game(chat_id)
         else:
-            bot.send_message(chat_id, "Not enough  players to start the game. Game canceled.")
+            bot.send_message(chat_id, "Not enough players to start the game. Game canceled.")
             del game_data[chat_id]
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('join_game'))
@@ -101,7 +92,7 @@ def start_game(chat_id):
         return
 
     game_data[chat_id]['auto_start'].cancel()  # Cancel auto-start timer if the game starts early
-    bot.send_message(chat_id, "The game is starting! Choose your weapon:")
+    bot.send_message(chat_id, "The game is starting! Players, check your private chat to choose your weapon.")
     for player_id in game_data[chat_id]['joined_players']:
         bot.send_message(player_id, "Choose your weapon:", reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True, keyboard=[['rock', 'paper', 'scissors']]))
 
