@@ -26,7 +26,7 @@ def start(message):
 
 @bot.message_handler(commands=['play'])
 def play(message):
-    if message.chat.type != 'group':
+    if message.chat.type not in ['group', 'supergroup']:
         bot.send_message(message.chat.id, "This bot only works in groups.")
         return
 
