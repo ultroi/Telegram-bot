@@ -5,7 +5,7 @@ import random
 import uuid
 import threading
 
-bot = telebot.TeleBot('7441832203:AAFpcfYbphZQ9cCFdxsHTABK9r4E18b4PiM')
+bot = telebot.TeleBot('YOUR_API_KEY')
 
 game_data = {}
 
@@ -30,32 +30,44 @@ def play(message):
         bot.send_message(message.chat.id, "This bot only works in groups.")
         return
 
-    markup = types.InlineKeyboardMarkup()
-    btn_join = types.InlineKeyboardButton(text="Join Game", callback_data="join_game")
-    markup.add(btn_join)
-    bot.send_message(message.chat.id, f"A game has been started. Click the button to join. Maximum {max_players} players can join:", reply_markup=markup)
+    if message.chat.id not in game_data:
+        game_data[message.chat.id] = {
+            'players': 1,
+            'bot_choice': None,
+            'timeout': time.time() + round_timeout,
+            'best_of': best_of,
+            'scores': {},
+            'player_choices': {},  # New dictionary for player choices
+            'joined_players': [message.from_user.id],
+            'game_id': generate_game_id(),
+            'joining_message_id': None  # Store ID of joining message
+        }
 
-    game_data[message.chat.id] = {
-        'players': 1,
-        'bot_choice': None,
-        'timeout': time.time() + round_timeout,
-        'best_of': best_of,
-        'scores': {},
-        'choices': {message.from_user.id: None},
-        'joined_players': [message.from_user.id],
-        'game_id': generate_game_id(),
-    }
+    # Send or edit joining message
+    if not game_data[message.chat.id]['joining_message_id']:
+        initial_message = bot.send_message(message.chat.id, f"{message.from_user.first_name} has joined the game (1 player)")
+        game_data[message.chat.id]['joining_message_id'] = initial_message.message_id
+    else:
+        current_players = len(game_data[message.chat.id]['joined_players'])
+        edited_message = bot.edit_message_text(
+            chat_id=message.chat.id,
+            message_id=game_data[message.chat.id]['joining_message_id'],
+            text=f"{message.from_user.first_name} has joined the game ({current_players} players)"
+        )
 
-    bot.send_message(message.chat.id, f"{message.from_user.first_name} has automatically joined the game.")
+    game_data[message.chat.id]['players'] += 1
+    game_data[message.chat.id]['joined_players'].append(message.from_user.id)
 
-    start_auto_start_timer(message.chat.id)
+    if game_data[message.chat.id]['players'] == min_players:
+        start_game(message.chat.id)
 
 def start_auto_start_timer(chat_id):
     if 'auto_start' in game_data[chat_id]:
         game_data[chat_id]['auto_start'].cancel()
 
     game_data[chat_id]['auto_start'] = threading.Timer(auto_start_time, auto_start_game, args=[chat_id])
-    game_data[chat_id]['auto_start'].start()
+    game_data
+    
 
 def auto_start_game(chat_id):
     if chat_id in game_data:
