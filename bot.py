@@ -35,6 +35,7 @@ def play(message):
     markup.add(btn_join)
     bot.send_message(message.chat.id, f"A game has been started. Click the button to join. Maximum {max_players} players can join:", reply_markup=markup)
 
+    # Automatically add the user who started the game
     game_data[message.chat.id] = {
         'players': 1, 
         'bot_choice': None, 
@@ -47,12 +48,15 @@ def play(message):
         'auto_start': threading.Timer(auto_start_time, auto_start_game, args=[message.chat.id])
     }
 
+    bot.send_message(message.chat.id, f"{message.from_user.first_name} has automatically joined the game.")
+
     # Start the auto-start timer
     game_data[message.chat.id]['auto_start'].start()
 
+
 def auto_start_game(chat_id):
     if chat_id in game_data:
-        if game_data[chat_id]['players'] >= min_players:
+        if game_data[chat_id]['player s'] >= min_players:
             start_game(chat_id)
         else:
             bot.send_message(chat_id, "Not enough players to start the game. Game canceled.")
