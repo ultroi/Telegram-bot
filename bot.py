@@ -50,10 +50,10 @@ def counter_move(move):
 # Async start function
 async def start(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = [
-        [InlineKeyboardButton("Single Player", callback_data='single_player')],
-        [InlineKeyboardButton("Multiplayer", callback_data='multiplayer')],
-        [InlineKeyboardButton("Stats", callback_data='show_stats')],
-        [InlineKeyboardButton("Help", callback_data='help')]
+        [InlineKeyboardButton("Single Player 🎮", callback_data='single_player')],
+        [InlineKeyboardButton("Multiplayer 👥", callback_data='multiplayer')],
+        [InlineKeyboardButton("Stats 📊", callback_data='show_stats')],
+        [InlineKeyboardButton("Help ❓", callback_data='help')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Welcome to Rock Paper Scissors Bot! Choose an option:", reply_markup=reply_markup)
@@ -182,6 +182,7 @@ async def single_player_move(update: Update, _: ContextTypes.DEFAULT_TYPE) -> No
         [InlineKeyboardButton("Check Stats 📊", callback_data='show_stats')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
+
     await query.edit_message_text(f"**You chose {player_choice}.**\n **Bot chose {bot_choice}.**\n **{result}**", reply_markup=reply_markup)
 
 
