@@ -58,6 +58,9 @@ async def start(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Welcome to Rock Paper Scissors Bot! Choose an option:", reply_markup=reply_markup)
 
+
+
+
 async def help_command(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query  # Handle callback queries
     logger.info("help_command triggered")
@@ -82,6 +85,9 @@ async def help_command(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         # If it's triggered by a message instead of a button click
         await update.message.reply_text(help_message, parse_mode='Markdown')
 
+
+
+
 # Async function to show developer commands
 async def show_dev_commands(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     dev_commands_message = ("*Developer Commands*:\n\n"
@@ -91,6 +97,8 @@ async def show_dev_commands(update: Update, _: ContextTypes.DEFAULT_TYPE) -> Non
                             "Use these commands responsibly!")
 
     await update.callback_query.edit_message_text(dev_commands_message, parse_mode='Markdown')
+
+
 
 # Async function to handle back to main menu
 async def back_to_main_menu(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
@@ -106,6 +114,8 @@ async def back_to_main_menu(update: Update, _: ContextTypes.DEFAULT_TYPE) -> Non
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text('Welcome to Rock Paper Scissors! Choose a mode to start:', reply_markup=reply_markup)
 
+
+
 # Function to check and delete inactive users
 async def check_inactive_users():
     while True:
@@ -117,6 +127,10 @@ async def check_inactive_users():
                     del stats[user_id]  # Optionally delete user stats as well
         await asyncio.sleep(86400)  # Check every day
 
+
+
+
+# Async mode selection function
 # Async mode selection function
 async def mode_selection(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -137,6 +151,8 @@ async def mode_selection(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
             await start_multiplayer(query)
         else:
             await query.edit_message_text("Multiplayer mode is only available in group chats!")
+
+
 
 # Async function for single-player mode
 async def start_single_player(query) -> None:
@@ -168,14 +184,9 @@ async def single_player_move(update: Update, _: ContextTypes.DEFAULT_TYPE) -> No
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(f"You chose {player_choice}. Bot chose {bot_choice}. {result}", reply_markup=reply_markup)
 
+
 # Async function for multiplayer mode
 async def start_multiplayer(query, context) -> None:
-    if query.data == 'multiplayer':
-    if update.effective_chat.type in ["group", "supergroup"]:
-        await start_multiplayer(query, _)
-    else:
-        await query.edit_message_text("Multiplayer mode is only available in group chats!")
-        
     caller_name = query.from_user.first_name
     user_activity[query.from_user.id] = datetime.now()  # Update user activity
     context.user_data['caller_name'] = caller_name
@@ -189,10 +200,14 @@ async def start_multiplayer(query, context) -> None:
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(text=f"{caller_name} is playing multiplayer! Choose your move:", reply_markup=reply_markup)
 
+
+
 # Async function for join timer
 async def join_timer(query):
     await asyncio.sleep(60)  # 1-minute timer
     await query.edit_message_text("Game has been terminated due to inactivity. Please start again!")
+
+
 
 # Async function to handle multiplayer move
 async def multiplayer_move(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
