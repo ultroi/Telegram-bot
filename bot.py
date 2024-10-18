@@ -183,8 +183,7 @@ async def single_player_move(update: Update, _: ContextTypes.DEFAULT_TYPE) -> No
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await query.edit_message_text(f"**You chose : {player_choice}.\nBot chose : {bot_choice}.\n{result}**",parse_mode="MarkdownV2", reply_markup=reply_markup)
-
+    await query.edit_message_text(f"**You chose : {player_choice}\\.\nBot chose : {bot_choice}\\.\n{result}**", parse_mode="MarkdownV2", reply_markup=reply_markup)
 
 # Async function for multiplayer mode
 async def start_multiplayer(query, context) -> None:
