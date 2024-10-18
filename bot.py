@@ -24,6 +24,12 @@ ban_list = {}
 leaderboard_data = {}
 unique_users = set()
 
+def escape_markdown_v2(text):
+    escape_chars = ['.', '!', '~', '*', '_', '[', ']', '(', ')', '`', '#', '+', '-', '=', '|', '{', '}', '>', '<']
+    for char in escape_chars:
+        text = text.replace(char, f'\\{char}')
+    return text
+
 # Predict the user's next move based on previous move history
 def predict_user_move(user_id):
     if user_id not in user_move_history or len(user_move_history[user_id]) < 2:
