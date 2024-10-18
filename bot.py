@@ -294,7 +294,7 @@ async def show_dev_stats(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
 
 # Main function to run the bot
 def main():
-    token = os.getenv("7441832203:AAEV96F3k9qIH3rm-LyTUfG-0kTl_CeN4Lg")
+    token = "7441832203:AAEV96F3k9qIH3rm-LyTUfG-0kTl_CeN4Lg"
     application = Application.builder().token(token).build()
 
     # Command handlers
