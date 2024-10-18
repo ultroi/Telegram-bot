@@ -152,6 +152,7 @@ async def start_single_player(query) -> None:
     await query.edit_message_text(text="You are playing against the bot! Choose your move:", reply_markup=reply_markup)
 
 # Handle single-player moves
+# Handle single-player moves
 async def single_player_move(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
@@ -166,7 +167,11 @@ async def single_player_move(update: Update, _: ContextTypes.DEFAULT_TYPE) -> No
         [InlineKeyboardButton("Check Stats 📊", callback_data='show_stats')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(f"**You chose : {player_choice}\\.\nBot chose : {bot_choice}\\.\n{result}**", parse_mode="MarkdownV2", reply_markup=reply_markup)
+
+    # Escaping special characters in MarkdownV2 format
+    message = f"**You chose: {player_choice}\\.\nBot chose: {bot_choice}\\.\n{result}**"
+    await query.edit_message_text(message, parse_mode="MarkdownV2", reply_markup=reply_markup)
+
 
 # Start multiplayer mode (group-only)
 async def start_multiplayer(query, context) -> None:
