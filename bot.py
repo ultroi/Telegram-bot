@@ -60,6 +60,7 @@ async def start(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def help_command(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query  # Handle callback queries
+    logger.info("help_command triggered")
     if query:
         await query.answer()  # Answer the callback query to remove the loading state
         keyboard = [
@@ -68,13 +69,13 @@ async def help_command(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        help_message = ("*Help Menu*:\n\n"
-                        "Here are the available commands:\n"
-                        "/start - Start the bot and choose a mode.\n"
-                        "/ban <user_id> - Ban a user from using the bot (Developer only).\n"
-                        "/unban <user_id> - Unban a user (Developer only).\n"
-                        "/dev_stats - Check developer stats (Developer only).\n"
-                        "/help - Show this help message.\n")
+        help_message = ("*Help Menu*:\\n\\n"
+                        "Here are the available commands:\\n"
+                        "/start - Start the bot and choose a mode.\\n"
+                        "/ban <user_id> - Ban a user from using the bot (Developer only).\\n"
+                        "/unban <user_id> - Unban a user (Developer only).\\n"
+                        "/dev_stats - Check developer stats (Developer only).\\n"
+                        "/help - Show this help message.\\n")
 
         await query.edit_message_text(help_message, parse_mode='Markdown', reply_markup=reply_markup)
     else:
@@ -169,6 +170,12 @@ async def single_player_move(update: Update, _: ContextTypes.DEFAULT_TYPE) -> No
 
 # Async function for multiplayer mode
 async def start_multiplayer(query, context) -> None:
+    if query.data == 'multiplayer':
+    if update.effective_chat.type in ["group", "supergroup"]:
+        await start_multiplayer(query, _)
+    else:
+        await query.edit_message_text("Multiplayer mode is only available in group chats!")
+        
     caller_name = query.from_user.first_name
     user_activity[query.from_user.id] = datetime.now()  # Update user activity
     context.user_data['caller_name'] = caller_name
@@ -235,11 +242,12 @@ def update_stats(player_name, result):
 
 # Command to show stats
 async def show_stats(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.info("show_stats triggered")
     user_name = update.callback_query.from_user.first_name
     user_stats = stats.get(user_name, {'wins': 0, 'losses': 0, 'ties': 0})
-    stats_message = (f"*Stats for {user_name}*:\n"
-                     f"**Wins**: {user_stats['wins']}\n"
-                     f"**Losses**: {user_stats['losses']}\n"
+    stats_message = (f"*Stats for {user_name}*:\\n"
+                     f"**Wins**: {user_stats['wins']}\\n"
+                     f"**Losses**: {user_stats['losses']}\\n"
                      f"**Ties**: {user_stats['ties']}")
 
     keyboard = [
