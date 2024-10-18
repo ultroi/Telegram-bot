@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # Developer ID
 DEV_ID = 5956598856
 
-# User move history for AI learning
+# Store user activity, stats, ban list, and leaderboard
 user_move_history = {}
 user_activity = {}
 stats = {}
@@ -24,6 +24,7 @@ ban_list = {}
 leaderboard_data = {}
 unique_users = set()
 
+# Predict the user's next move based on previous move history
 def predict_user_move(user_id):
     if user_id not in user_move_history or len(user_move_history[user_id]) < 2:
         return random.choice(['rock', 'paper', 'scissors'])
@@ -39,6 +40,7 @@ def predict_user_move(user_id):
     predicted_move = max(move_counts, key=move_counts.get)
     return predicted_move
 
+# Determine counter-move to beat the user's move
 def counter_move(move):
     if move == 'rock':
         return 'paper'
@@ -47,7 +49,7 @@ def counter_move(move):
     else:
         return 'rock'
 
-# Async start function
+# Start command: Display main menu options
 async def start(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = [
         [InlineKeyboardButton("Single Player 🎮", callback_data='single_player')],
@@ -58,45 +60,46 @@ async def start(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Welcome to Rock Paper Scissors Bot! Choose an option:", reply_markup=reply_markup)
 
+# Help command: Display available commands
 async def help_command(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query  # Handle callback queries
-    logger.info("help_command triggered")
+    query = update.callback_query
+    help_message = (
+        "*Help Menu*:\n\n"
+        "Here are the available commands:\n"
+        "/start - Start the bot and choose a mode.\n"
+        "/ban <user_id> - Ban a user (Developer only).\n"
+        "/unban <user_id> - Unban a user (Developer only).\n"
+        "/dev_stats - Check developer stats (Developer only).\n"
+        "/help - Show this help message.\n"
+    )
+
     if query:
-        await query.answer()  # Answer the callback query to remove the loading state
+        await query.answer()
         keyboard = [
             [InlineKeyboardButton("Developer Commands", callback_data='dev_commands')],
             [InlineKeyboardButton("Back to Menu", callback_data='main_menu')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-
-        help_message = ("*Help Menu*:\\n\\n"
-                        "Here are the available commands:\\n"
-                        "/start - Start the bot and choose a mode.\\n"
-                        "/ban <user_id> - Ban a user from using the bot (Developer only).\\n"
-                        "/unban <user_id> - Unban a user (Developer only).\\n"
-                        "/dev_stats - Check developer stats (Developer only).\\n"
-                        "/help - Show this help message.\\n")
-
         await query.edit_message_text(help_message, parse_mode='Markdown', reply_markup=reply_markup)
     else:
-        # If it's triggered by a message instead of a button click
         await update.message.reply_text(help_message, parse_mode='Markdown')
 
-# Async function to show developer commands
+# Display developer commands
 async def show_dev_commands(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
-    dev_commands_message = ("*Developer Commands*:\n\n"
-                            "/ban <user_id> - Ban a user from using the bot.\n"
-                            "/unban <user_id> - Unban a user.\n"
-                            "/dev_stats - Check stats related to users and games.\n"
-                            "Use these commands responsibly!")
-
+    dev_commands_message = (
+        "*Developer Commands*:\n\n"
+        "/ban <user_id> - Ban a user from using the bot.\n"
+        "/unban <user_id> - Unban a user.\n"
+        "/dev_stats - Check user and game stats.\n"
+        "Use these commands responsibly!"
+    )
     await update.callback_query.edit_message_text(dev_commands_message, parse_mode='Markdown')
 
-# Async function to handle back to main menu
+# Return to main menu
 async def back_to_main_menu(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
-
+    
     keyboard = [
         [InlineKeyboardButton("Single Player 🎮", callback_data='single_player')],
         [InlineKeyboardButton("Multiplayer 👥 (Group only)", callback_data='multiplayer')],
@@ -104,9 +107,9 @@ async def back_to_main_menu(update: Update, _: ContextTypes.DEFAULT_TYPE) -> Non
         [InlineKeyboardButton("Help ❓", callback_data='help')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text('Welcome to Rock Paper Scissors! Choose a mode to start:', reply_markup=reply_markup)
+    await query.edit_message_text('Welcome back to Rock Paper Scissors! Choose a mode to start:', reply_markup=reply_markup)
 
-# Function to check and delete inactive users
+# Check and delete inactive users
 async def check_inactive_users():
     while True:
         current_time = datetime.now()
@@ -115,17 +118,17 @@ async def check_inactive_users():
                 del user_activity[user_id]
                 if user_id in stats:
                     del stats[user_id]  # Optionally delete user stats as well
-        await asyncio.sleep(86400)  # Check every day
+        await asyncio.sleep(86400)  # Check every 24 hours
 
-# Async mode selection function
+# Handle mode selection (Single-player, Multiplayer, Stats, Help)
 async def mode_selection(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
-
+    
     user_activity[query.from_user.id] = datetime.now()  # Update user activity
-    unique_users.add(query.from_user.id)  # Add user to the set
+    unique_users.add(query.from_user.id)  # Track unique users
 
-    # Check if user is banned
+    # Check if the user is banned
     if query.from_user.id in ban_list:
         await query.edit_message_text("You have been banned from using this bot.")
         return
@@ -134,11 +137,11 @@ async def mode_selection(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         await start_single_player(query)
     elif query.data == 'multiplayer':
         if update.effective_chat.type in ["group", "supergroup"]:
-            await start_multiplayer(query)
+            await start_multiplayer(query, _)
         else:
-            await query.edit_message_text("Multiplayer mode is only available in group chats!")
+            await query.edit_message_text("Multiplayer mode is only available in group chats.")
 
-# Async function for single-player mode
+# Start single-player mode
 async def start_single_player(query) -> None:
     keyboard = [
         [InlineKeyboardButton("Rock 🪨", callback_data='rock_bot')],
@@ -148,31 +151,26 @@ async def start_single_player(query) -> None:
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(text="You are playing against the bot! Choose your move:", reply_markup=reply_markup)
 
-# Async function to handle single-player moves
+# Handle single-player moves
 async def single_player_move(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
-
-    user_activity[query.from_user.id] = datetime.now()  # Update user activity
-
-    player_choice = query.data.split('_')[0]  # Get player choice
+    
+    player_choice = query.data.split('_')[0]
     bot_choice = random.choice(['rock', 'paper', 'scissors'])
     result = determine_winner(player_choice, bot_choice)
-
-    update_stats(query.from_user.first_name, result)  # Update user stats
+    update_stats(query.from_user.first_name, result)  # Update stats
 
     keyboard = [
         [InlineKeyboardButton("Play Again 🔄", callback_data='single_player')],
         [InlineKeyboardButton("Check Stats 📊", callback_data='show_stats')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(f"**You chose : {player_choice}\\.\nBot chose : {bot_choice}\\.\n{result}**", parse_mode="MarkdownV2", reply_markup=reply_markup)
 
-    await query.edit_message_text(f"**You chose {player_choice}.**\n **Bot chose {bot_choice}.**\n **{result}**", parse_mode="MarkdownV2", reply_markup=reply_markup)
-
-# Async function for multiplayer mode
+# Start multiplayer mode (group-only)
 async def start_multiplayer(query, context) -> None:
     caller_name = query.from_user.first_name
-    user_activity[query.from_user.id] = datetime.now()  # Update user activity
     context.user_data['caller_name'] = caller_name
     context.user_data['join_timer'] = asyncio.get_event_loop().create_task(join_timer(query))
 
@@ -184,26 +182,24 @@ async def start_multiplayer(query, context) -> None:
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(text=f"{caller_name} is playing multiplayer! Choose your move:", reply_markup=reply_markup)
 
-# Async function for join timer
+# Multiplayer join timer
 async def join_timer(query):
     await asyncio.sleep(60)  # 1-minute timer
     await query.edit_message_text("Game has been terminated due to inactivity. Please start again!")
 
-# Async function to handle multiplayer move
+# Handle multiplayer move
 async def multiplayer_move(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
 
-    user_activity[query.from_user.id] = datetime.now()  # Update user activity
-
     player_choice = query.data.split('_')[1]
     player_name = query.data.split('_')[2]
-
+    
     bot_choice = random.choice(['rock', 'paper', 'scissors'])
     result = determine_winner(player_choice, bot_choice)
-
-    update_stats(player_name, result)  # Update user stats
-    leaderboard_data[player_name] = stats[player_name]['wins']  # Update leaderboard data
+    
+    update_stats(player_name, result)
+    leaderboard_data[player_name] = stats[player_name]['wins']  # Update leaderboard
 
     keyboard = [
         [InlineKeyboardButton("Play Again 🔄", callback_data='multiplayer')],
@@ -212,146 +208,110 @@ async def multiplayer_move(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(f"{player_name} chose {player_choice}. Bot chose {bot_choice}. {result}", reply_markup=reply_markup)
 
-# Utility function to determine the winner
+# Determine the winner of the game
 def determine_winner(player_choice, bot_choice):
     if player_choice == bot_choice:
         return "It's a tie!"
     elif (player_choice == 'rock' and bot_choice == 'scissors') or \
-         (player_choice == 'scissors' and bot_choice == 'paper') or \
-         (player_choice == 'paper' and bot_choice == 'rock'):
+         (player_choice == 'paper' and bot_choice == 'rock') or \
+         (player_choice == 'scissors' and bot_choice == 'paper'):
         return "You win!"
     else:
         return "Bot wins!"
 
-# Function to update stats
+# Update player stats
 def update_stats(player_name, result):
     if player_name not in stats:
         stats[player_name] = {'wins': 0, 'losses': 0, 'ties': 0}
-
-    if "win" in result:
+    
+    if "win" in result.lower():
         stats[player_name]['wins'] += 1
-    elif "loss" in result:
-        stats[player_name]['losses'] += 1
-    else:
+    elif "tie" in result.lower():
         stats[player_name]['ties'] += 1
+    else:
+        stats[player_name]['losses'] += 1
 
-# Command to show stats
+# Show stats to the user
 async def show_stats(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
-    logger.info("show_stats triggered")
-    user_name = update.callback_query.from_user.first_name
-    user_stats = stats.get(user_name, {'wins': 0, 'losses': 0, 'ties': 0})
-    stats_message = (f"*Stats for {user_name}*:\\n"
-                     f"**Wins**: {user_stats['wins']}\\n"
-                     f"**Losses**: {user_stats['losses']}\\n"
-                     f"**Ties**: {user_stats['ties']}")
+    query = update.callback_query
+    await query.answer()
+    
+    player_name = query.from_user.first_name
+    if player_name in stats:
+        wins = stats[player_name]['wins']
+        losses = stats[player_name]['losses']
+        ties = stats[player_name]['ties']
+        await query.edit_message_text(f"{player_name}, here are your stats:\nWins: {wins}\nLosses: {losses}\nTies: {ties}")
+    else:
+        await query.edit_message_text("No stats found for you. Start playing to record your stats!")
 
-    keyboard = [
-        [InlineKeyboardButton("Play Again", callback_data="play_again")],
-        [InlineKeyboardButton("Exit", callback_data="exit")]
-    ]
-
-    await update.callback_query.edit_message_text(stats_message, parse_mode='Markdown')
-
-# Command to show leaderboard
-async def show_leaderboard(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
-    leaderboard_message = "🏆 **Leaderboard** 🏆\n"
-    sorted_leaderboard = sorted(leaderboard_data.items(), key=lambda item: item[1], reverse=True)
-
-    for idx, (player_name, wins) in enumerate(sorted_leaderboard, start=1):
-        leaderboard_message += f"{idx}. {player_name}: {wins} wins\n"
-
-    await update.callback_query.edit_message_text(leaderboard_message)
-
-# Developer command to check stats
+# Ban a user (Developer only)
 async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    try:
-        if update.effective_user.id != DEV_ID:
-            await update.message.reply_text("You are not authorized to use this command.")
-            return
-
-        # Check if user_id was provided
-        if len(context.args) != 1:
-            await update.message.reply_text("Usage: /ban <user_id>")
-            return
-
-        user_id = int(context.args[0])
-        if user_id in ban_list:
-            await update.message.reply_text(f"User {user_id} is already banned.")
-        else:
+    if update.effective_user.id == DEV_ID:
+        if len(context.args) > 0:
+            user_id = int(context.args[0])
             ban_list[user_id] = True
-            user_activity[user_id] = datetime.now()  # Update user activity for tracking
             await update.message.reply_text(f"User {user_id} has been banned.")
-    except ValueError:
-        await update.message.reply_text("Please provide a valid user ID.")
-    except Exception as e:
-        await update.message.reply_text(f"An error occurred: {str(e)}")
-
-async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    try:
-        if update.effective_user.id != DEV_ID:
-            await update.message.reply_text("You are not authorized to use this command.")
-            return
-
-        # Check if user_id was provided
-        if len(context.args) != 1:
-            await update.message.reply_text("Usage: /unban <user_id>")
-            return
-
-        user_id = int(context.args[0])
-        if user_id in ban_list:
-            del ban_list[user_id]
-            await update.message.reply_text(f"User {user_id} has been unbanned.")
         else:
-            await update.message.reply_text(f"User {user_id} is not in the ban list.")
-    except ValueError:
-        await update.message.reply_text("Please provide a valid user ID.")
-    except Exception as e:
-        await update.message.reply_text(f"An error occurred: {str(e)}")
+            await update.message.reply_text("Please provide a user ID to ban.")
+    else:
+        await update.message.reply_text("You are not authorized to use this command.")
 
-# Command to display developer stats (active users, inactive users, etc.)
-async def dev_stats(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
-    try:
-        if update.effective_user.id != DEV_ID:
-            await update.message.reply_text("You are not authorized to use this command.")
-            return
+# Unban a user (Developer only)
+async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_user.id == DEV_ID:
+        if len(context.args) > 0:
+            user_id = int(context.args[0])
+            if user_id in ban_list:
+                del ban_list[user_id]
+                await update.message.reply_text(f"User {user_id} has been unbanned.")
+            else:
+                await update.message.reply_text(f"User {user_id} is not banned.")
+        else:
+            await update.message.reply_text("Please provide a user ID to unban.")
+    else:
+        await update.message.reply_text("You are not authorized to use this command.")
 
+# Show developer stats (Developer only)
+async def show_dev_stats(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_user.id == DEV_ID:
+        total_games = sum([stats[p]['wins'] + stats[p]['losses'] + stats[p]['ties'] for p in stats])
         active_users = len(user_activity)
-        inactive_users = len([user for user, last_active in user_activity.items() if datetime.now() - last_active > timedelta(days=7)])
-        total_games = sum([user_stats['wins'] + user_stats['losses'] + user_stats['ties'] for user_stats in stats.values()])
+        inactive_users = len(user_activity) - active_users
+        
+        await update.message.reply_text(
+            f"Total games played: {total_games}\n"
+            f"Active users: {active_users}\n"
+            f"Inactive users: {inactive_users}"
+        )
+    else:
+        await update.message.reply_text("You are not authorized to use this command.")
 
-        stats_message = (f"Developer Stats:\n"
-                         f"Total Active Users: {active_users}\n"
-                         f"Inactive Users: {inactive_users}\n"
-                         f"Total Games Played: {total_games}\n"
-                         f"Ban List: {', '.join([str(user) for user in ban_list.keys()])}")
+# Main function to run the bot
+def main():
+    token = os.getenv("TOKEN")
+    application = Application.builder().token(token).build()
 
-        await update.message.reply_text(stats_message)
-    except Exception as e:
-        await update.message.reply_text(f"An error occurred: {str(e)}")
-
-def main() -> None:
-    # Define your bot's token as an environment variable
-    TOKEN = "7441832203:AAFI6Xxa_T5KC4kTLsdYlLHcwcx6jB3Yje4"
-
-    application = Application.builder().token(TOKEN).build()
-
+    # Command handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("ban", ban_user))
     application.add_handler(CommandHandler("unban", unban_user))
-    application.add_handler(CommandHandler("dev_stats", dev_stats))
+    application.add_handler(CommandHandler("dev_stats", show_dev_stats))
 
+    # Callback query handler
     application.add_handler(CallbackQueryHandler(mode_selection, pattern='^(single_player|multiplayer|show_stats|help)$'))
     application.add_handler(CallbackQueryHandler(single_player_move, pattern='^(rock_bot|paper_bot|scissors_bot)$'))
     application.add_handler(CallbackQueryHandler(multiplayer_move, pattern='^(rock_multiplayer|paper_multiplayer|scissors_multiplayer)_.*$'))
-    application.add_handler(CallbackQueryHandler(show_stats, pattern='show_stats'))
-    application.add_handler(CallbackQueryHandler(show_leaderboard, pattern='leaderboard'))
     application.add_handler(CallbackQueryHandler(show_dev_commands, pattern='dev_commands'))
     application.add_handler(CallbackQueryHandler(back_to_main_menu, pattern='main_menu'))
 
-    loop = asyncio.get_event_loop()
-    loop.create_task(check_inactive_users())
+    # Start checking for inactive users in the background
+    asyncio.create_task(check_inactive_users())
+
+    # Start the bot
     application.run_polling()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
+
