@@ -312,7 +312,8 @@ def main():
     application.add_handler(CallbackQueryHandler(back_to_main_menu, pattern='main_menu'))
 
     # Start checking for inactive users in the background
-    asyncio.create_task(check_inactive_users())
+    loop = asyncio.get_event_loop()
+    loop.create_task(check_inactive_users())
 
     # Start the bot
     application.run_polling()
