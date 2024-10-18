@@ -358,13 +358,17 @@ def main() -> None:
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CallbackQueryHandler(mode_selection, pattern='^(single_player|multiplayer|show_stats|help)$'))
-    application.add_handler(CallbackQueryHandler(single_player_move, pattern='^(rock_bot|paper_bot|scissors_bot)$'))
-    application.add_handler(CallbackQueryHandler(multiplayer_move, pattern='^(rock_multiplayer|paper_multiplayer|scissors_multiplayer)_.*$'))
-    application.add_handler(CallbackQueryHandler(show_stats, pattern='^show_stats$'))
     application.add_handler(CommandHandler("ban", ban_user))
     application.add_handler(CommandHandler("unban", unban_user))
     application.add_handler(CommandHandler("dev_stats", dev_stats))
+
+    application.add_handler(CallbackQueryHandler(mode_selection, pattern='^(single_player|multiplayer|show_stats|help)$'))
+    application.add_handler(CallbackQueryHandler(single_player_move, pattern='^(rock_bot|paper_bot|scissors_bot)$'))
+    application.add_handler(CallbackQueryHandler(multiplayer_move, pattern='^(rock_multiplayer|paper_multiplayer|scissors_multiplayer)_.*$'))
+    application.add_handler(CallbackQueryHandler(show_stats, pattern='show_stats'))
+    application.add_handler(CallbackQueryHandler(show_leaderboard, pattern='leaderboard'))
+    application.add_handler(CallbackQueryHandler(show_dev_commands, pattern='dev_commands'))
+    application.add_handler(CallbackQueryHandler(back_to_main_menu, pattern='main_menu'))
 
     loop = asyncio.get_event_loop()
     loop.create_task(check_inactive_users())
