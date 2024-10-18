@@ -67,7 +67,7 @@ async def start(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("Welcome to Rock Paper Scissors Bot! Choose an option:", reply_markup=reply_markup)
 
 # Help command: Display available commands
-async def help_command(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
+async def help_command(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None: 
     query = update.callback_query
     help_message = (
         "*Help Menu*:\n\n"
@@ -79,16 +79,17 @@ async def help_command(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         "/help - Show this help message.\n"
     )
 
+    keyboard = [
+        [InlineKeyboardButton("Developer Commands", callback_data='dev_commands')],
+        [InlineKeyboardButton("Back to Menu", callback_data='main_menu')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
     if query:
         await query.answer()
-        keyboard = [
-            [InlineKeyboardButton("Developer Commands", callback_data='dev_commands')],
-            [InlineKeyboardButton("Back to Menu", callback_data='main_menu')]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(help_message, parse_mode='Markdown', reply_markup=reply_markup)
+        await query.edit_message_text(help_message, parse_mode='MarkdownV2', reply_markup=reply_markup)
     else:
-        await update.message.reply_text(help_message, parse_mode='Markdown')
+        await update.message.reply_text(help_message, parse_mode='MarkdownV2')
 
 # Display developer commands
 async def show_dev_commands(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
@@ -99,7 +100,14 @@ async def show_dev_commands(update: Update, _: ContextTypes.DEFAULT_TYPE) -> Non
         "/dev_stats - Check user and game stats.\n"
         "Use these commands responsibly!"
     )
-    await update.callback_query.edit_message_text(dev_commands_message, parse_mode='Markdown')
+
+    # Check if it's a callback query and respond accordingly
+    query = update.callback_query
+    if query:
+        await query.answer()
+        await query.edit_message_text(dev_commands_message, parse_mode='MarkdownV2')
+    else:
+        await update.message.reply_text(dev_commands_message, parse_mode='MarkdownV2')
 
 # Return to main menu
 async def back_to_main_menu(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
@@ -157,7 +165,6 @@ async def start_single_player(query) -> None:
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(text="You are playing against the bot! Choose your move:", reply_markup=reply_markup)
 
-# Handle single-player moves
 # Handle single-player moves
 async def single_player_move(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -245,16 +252,22 @@ def update_stats(player_name, result):
 # Show stats to the user
 async def show_stats(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    await query.answer()
+    await query.answer()  # Acknowledge the button press
     
-    player_name = query.from_user.first_name
-    if player_name in stats:
-        wins = stats[player_name]['wins']
-        losses = stats[player_name]['losses']
-        ties = stats[player_name]['ties']
-        await query.edit_message_text(f"{player_name}, here are your stats:\nWins: {wins}\nLosses: {losses}\nTies: {ties}")
+    player_name = query.from_user.first_name  # Get the user's first name
+    if player_name in stats:  # Check if the player has stats recorded
+        wins = stats[player_name].get('wins', 0)  # Get wins, default to 0 if not found
+        losses = stats[player_name].get('losses', 0)  # Get losses, default to 0 if not found
+        ties = stats[player_name].get('ties', 0)  # Get ties, default to 0 if not found
+        await query.edit_message_text(
+            f"{player_name}, here are your stats:\n"
+            f"Wins: {wins}\n"
+            f"Losses: {losses}\n"
+            f"Ties: {ties}"
+        )
     else:
         await query.edit_message_text("No stats found for you. Start playing to record your stats!")
+
 
 # Ban a user (Developer only)
 async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
