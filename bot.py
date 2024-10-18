@@ -182,7 +182,7 @@ async def single_player_move(update: Update, _: ContextTypes.DEFAULT_TYPE) -> No
         [InlineKeyboardButton("Check Stats 📊", callback_data='show_stats')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(f"You chose {player_choice}. Bot chose {bot_choice}. {result}", reply_markup=reply_markup)
+    await query.edit_message_text(f"**You chose {player_choice}.**\n **Bot chose {bot_choice}.**\n **{result}**", reply_markup=reply_markup)
 
 
 # Async function for multiplayer mode
