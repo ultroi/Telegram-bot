@@ -24,9 +24,10 @@ ban_list = {}
 leaderboard_data = {}
 unique_users = set()
 
-def escape_markdown_v2(text):
-    escape_chars = ['.', '!', '~', '*', '_', '[', ']', '(', ')', '`', '#', '+', '-', '=', '|', '{', '}', '>', '<']
-    for char in escape_chars:
+def escape_markdown_v2(text: str) -> str:
+    """Escape special characters in MarkdownV2."""
+    special_characters = ['.', '!', '*', '_', '[', ']', '(', ')', '~', '>', '#', '+', '-', '=', '|', '{', '}', '.']
+    for char in special_characters:
         text = text.replace(char, f'\\{char}')
     return text
 
@@ -310,6 +311,14 @@ async def show_dev_stats(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         )
     else:
         await update.message.reply_text("You are not authorized to use this command.")
+
+
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Log the error
+    print(f"Update {update} caused error {context.error}")
+    # Optionally, inform the user
+    if update.effective_message:
+        await update.effective_message.reply_text("An error occurred. Please try again.")
 
 # Main function to run the bot
 def main():
