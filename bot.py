@@ -2,6 +2,7 @@ import os
 import random
 import logging
 import asyncio
+from asyncio import Lock
 import sqlite3
 from datetime import datetime, timedelta
 import contextlib
@@ -237,313 +238,203 @@ async def single_player_move(update: Update, _: ContextTypes.DEFAULT_TYPE) -> No
 
 
 # Start multiplayer mode (group-only)
+# Locks for concurrency management
+game_locks = {}
+
+# Safely update the game using locks to prevent race conditions
+async def update_game_safe(game_id, update_func):
+    if game_id not in game_locks:
+        game_locks[game_id] = Lock()
+
+    async with game_locks[game_id]:  # Ensure only one coroutine can update the game at a time
+        game = get_game_from_db(game_id)
+        if game:  # Ensure the game exists before updating
+            update_func(game)
+            update_game_in_db(game_id, game)
+        else:
+            raise ValueError("Game not found")
+
+# Start multiplayer game
 async def start_multiplayer(query: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if query.message.chat.type not in ["group", "supergroup"]:
-        await query.edit_message_text("Multiplayer mode is only available in group chats.")
-        return
+    try:
+        chat_id = query.message.chat.id
+        message_id = query.message.message_id
+        game_id = f"{chat_id}_{message_id}"
+        caller_name = query.from_user.first_name
 
-    chat_id = query.message.chat.id
-    message_id = query.message.message_id
-    game_id = f"{chat_id}_{message_id}"
+        # Try to retrieve or create the game
+        game = get_game_from_db(game_id)
+        if game is None:
+            game = {'caller_name': caller_name, 'players': [caller_name], 'join_timer_active': True}
+            save_game_to_db(game_id, game)
+        else:
+            game['caller_name'] = caller_name
+            game['players'] = [caller_name]
+            game['join_timer_active'] = True
+            update_game_in_db(game_id, game)
 
-    caller_name = query.from_user.first_name
+        # Compact callback data to avoid length issues
+        keyboard = [
+            [InlineKeyboardButton("Challenge", callback_data=f'join_{game_id}')],
+            [InlineKeyboardButton("Back to Menu", callback_data='main_menu')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(f"{caller_name} started a game! Waiting for challengers...", reply_markup=reply_markup)
 
-    # Initialize the game data
-    game = get_game_from_db(game_id)
-    if game is None:
-        game = {
-        'caller_name': caller_name,
-        'players': [caller_name],
-        'join_timer_active': True
-    }
-        save_game_to_db(game_id, game)
-    else:
-        game['caller_name'] = caller_name
-        game['players'] = [caller_name]
-        game['join_timer_active'] = True
-        update_game_in_db(game_id, game)
+        # Start the 30-second join timer
+        await join_timer(query, context, game_id)
+    except Exception as e:
+        await query.message.reply_text("An error occurred while starting the multiplayer game.")
+        print(f"Error in start_multiplayer: {e}")
 
-    # Create a Join Game button and start the timer
-    keyboard = [
-        [InlineKeyboardButton("Join Game", callback_data=f'join_multiplayer_{game_id}')],
-        [InlineKeyboardButton("Back to Menu", callback_data='main_menu')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(
-        text=f"{caller_name} has started a multiplayer game! Waiting for another player to join... (60 seconds remaining)",
-        reply_markup=reply_markup
-    )
-
-    # Start the join timer with countdown updates
-    await join_timer(query, context, game_id)
-
-
-# Helper function to check if the message content has changed
-def message_needs_update(current_message, new_text, new_reply_markup):
-    current_text = current_message.text
-    current_reply_markup = current_message.reply_markup
-
-    # Check if the text or reply markup has changed
-    if current_text == new_text and current_reply_markup == new_reply_markup:
-        return False
-    return True
-
-
-# Join timer for multiplayer game
+# Join timer with 30-second wait for another player to join
 async def join_timer(query: Update, context: ContextTypes.DEFAULT_TYPE, game_id: str):
-    await asyncio.sleep(30)  # Wait for 30 seconds
+    try:
+        await asyncio.sleep(30)  # Retain the 30-second timer
+        game = get_game_from_db(game_id)
+        if game and len(game['players']) < 2:
+            await query.edit_message_text("Game Terminated due to insufficient players.")
+            remove_game_from_db(game_id)
+        elif game:
+            await start_multiplayer_game(query, context, game_id)
+    except Exception as e:
+        await query.message.reply_text("An error occurred during the game.")
+        print(f"Error in join_timer: {e}")
 
-    game = get_game_from_db(game_id)
-
-    # Check if the game exists and has less than 2 players
-    if game and len(game['players']) < 2:
-        # New message and reply markup to update
-        new_text = "Game has been terminated due to insufficient players. Please start again!"
-        new_reply_markup = None  # No reply markup for terminated message
-
-        # Check if the message needs updating before calling edit_message_text
-        if message_needs_update(query.message, new_text, new_reply_markup):
-            await query.message.edit_text(new_text)
-        cursor.execute('DELETE FROM games WHERE game_id = ?', (game_id,))
-        conn.commit()
-
-    elif game:
-        # New message and reply markup to start the game
-        new_text = "The game is starting now!"
-        new_reply_markup = None  # No reply markup for the starting message
-
-        # Check if the message needs updating before calling edit_message_text
-        if message_needs_update(query.message, new_text, new_reply_markup):
-            await query.message.edit_text(new_text)
-
-        await start_multiplayer_game(query, context, game_id)
-
-    # Deactivate the join timer if game still exists
-    if game:
-        game['join_timer_active'] = False
-        update_game_in_db(game_id, game)
-
-
-# Join multiplayer game
+# Player joins multiplayer game
 async def join_multiplayer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-
-    # Immediately answer the query to avoid expiration issues
-    with contextlib.suppress(telegram.error.BadRequest):
-        await query.answer()
-
+    await query.answer()
     player_name = query.from_user.first_name
     game_id = query.data.split('_')[-1]
 
-    game = get_game_from_db(game_id)
+    try:
+        game = get_game_from_db(game_id)
+        if not game:
+            await query.edit_message_text("This game is no longer available.")
+            return
 
-    if not game:
-        # No need to update if the game doesn't exist anymore
-        await query.edit_message_text("This game is no longer available.")
-        return
+        caller_name = game['caller_name']
+        if player_name == caller_name:
+            await query.answer("You cannot join your own game. Waiting for another player to join...", show_alert=True)
+            return
 
-    caller_name = game['caller_name']
+        if len(game['players']) >= 2:
+            await query.answer("The game is already full. Please wait for the next game.", show_alert=True)
+            return
 
-    if player_name == caller_name:
-        await query.answer("You cannot join your own game. Waiting for another player to join...", show_alert=True)
-        return
-
-    if len(game['players']) >= 2:
-        await query.answer("The game is already full. Please wait for the next game.", show_alert=True)
-        return
-
-    game['players'].append(player_name)
-    update_game_in_db(game_id, game)
-
-    # Check if the game is now full (2 players)
-    if len(game['players']) == 2:
-        game['join_timer_active'] = False
+        game['players'].append(player_name)
         update_game_in_db(game_id, game)
-        new_text = f"{player_name} has joined the game! The game will start shortly..."
-        new_reply_markup = None
 
-        # Only update the message if content has changed
-        if message_needs_update(query.message, new_text, new_reply_markup):
-            await query.edit_message_text(new_text)
-        await start_multiplayer_game(query, context, game_id)
-    else:
-        new_text = f"{player_name} has joined the game! Waiting for another player to join..."
-        new_reply_markup = query.message.reply_markup
+        if len(game['players']) == 2:
+            game['join_timer_active'] = False
+            update_game_in_db(game_id, game)
+            await matchmaking_process(query, game_id, caller_name, player_name)
+        else:
+            await query.edit_message_text(f"{player_name} has joined the game! Waiting for another player to join...")
+    except Exception as e:
+        await query.message.reply_text("An error occurred while joining the game.")
+        print(f"Error in join_multiplayer: {e}")
 
-        # Only update the message if content has changed
-        if message_needs_update(query.message, new_text, new_reply_markup):
-            await query.edit_message_text(new_text)
+# Matchmaking process before starting the actual game
+async def matchmaking_process(query, game_id, caller_name, player_name):
+    try:
+        messages = [
+            f"{player_name} has joined the game!",
+            f"{player_name} has challenged you, {caller_name}",
+            f"{player_name} vs {caller_name}",
+            "...Matchmaking... ... ..."
+        ]
+        for message in messages:
+            await query.edit_message_text(message)
+            await asyncio.sleep(1.5)
+        await query.edit_message_text(f"**{caller_name} vs {player_name}** 🥳", parse_mode='Markdown')
+        await start_multiplayer_game(query, None, game_id)
+    except Exception as e:
+        await query.message.reply_text("An error occurred during matchmaking.")
+        print(f"Error in matchmaking_process: {e}")
 
-
-def ensure_multiplayer_moves_exists(context: ContextTypes.DEFAULT_TYPE, game_id: str):
-    if 'multiplayer_moves' not in context.user_data:
-        context.user_data['multiplayer_moves'] = {}
-    if game_id not in context.user_data['multiplayer_moves']:
-        # Initialize empty moves for both players
-        context.user_data['multiplayer_moves'][game_id] = {'player1': None, 'player2': None}
-
-
-# Start multiplayer game
+# Start the actual multiplayer game
 async def start_multiplayer_game(query: Update, context: ContextTypes.DEFAULT_TYPE, game_id: str):
-    # Ensure 'games' and 'multiplayer_moves' exist
-    ensure_games_exists(context)
-    ensure_multiplayer_moves_exists(context, game_id)
+    try:
+        game = get_game_from_db(game_id)
+        if not game:
+            await query.message.edit_text("Error starting the game. Please try again.")
+            return
 
-    game = context.user_data['games'].get(game_id)
+        player1, player2 = game['players']
 
-    if not game:
-        await query.message.edit_text("Error starting the game. Please try again.")
-        return
+        # Use shortened callback data for player moves
+        p1_id, p2_id = 1, 2  # Example mapping of player names to IDs
 
-    player1, player2 = game['players']
+        keyboard_p1 = [
+            [InlineKeyboardButton("Rock 🪨", callback_data=f'r_m_{p1_id}_{game_id}')],
+            [InlineKeyboardButton("Paper 📄", callback_data=f'p_m_{p1_id}_{game_id}')],
+            [InlineKeyboardButton("Scissors ✂️", callback_data=f's_m_{p1_id}_{game_id}')],
+        ]
+        reply_markup_p1 = InlineKeyboardMarkup(keyboard_p1)
+        await query.message.reply_text(f"{player1}, choose your move:", reply_markup=reply_markup_p1)
 
-    # Player 1's move options
-    keyboard_p1 = [
-        [InlineKeyboardButton("Rock 🪨", callback_data=f'rock_multiplayer_{player1}_{game_id}')],
-        [InlineKeyboardButton("Paper 📄", callback_data=f'paper_multiplayer_{player1}_{game_id}')],
-        [InlineKeyboardButton("Scissors ✂️", callback_data=f'scissors_multiplayer_{player1}_{game_id}')],
-    ]
-    reply_markup_p1 = InlineKeyboardMarkup(keyboard_p1)
-    await query.message.reply_text(f"{player1}, choose your move:", reply_markup=reply_markup_p1)
-
-    # Player 2's move options
-    keyboard_p2 = [
-        [InlineKeyboardButton("Rock 🪨", callback_data=f'rock_multiplayer_{player2}_{game_id}')],
-        [InlineKeyboardButton("Paper 📄", callback_data=f'paper_multiplayer_{player2}_{game_id}')],
-        [InlineKeyboardButton("Scissors ✂️", callback_data=f'scissors_multiplayer_{player2}_{game_id}')],
-    ]
-    reply_markup_p2 = InlineKeyboardMarkup(keyboard_p2)
-    await query.message.reply_text(f"{player2}, choose your move:", reply_markup=reply_markup_p2)
-
-
+        keyboard_p2 = [
+            [InlineKeyboardButton("Rock 🪨", callback_data=f'r_m_{p2_id}_{game_id}')],
+            [InlineKeyboardButton("Paper 📄", callback_data=f'p_m_{p2_id}_{game_id}')],
+            [InlineKeyboardButton("Scissors ✂️", callback_data=f's_m_{p2_id}_{game_id}')],
+        ]
+        reply_markup_p2 = InlineKeyboardMarkup(keyboard_p2)
+        await query.message.reply_text(f"{player2}, choose your move:", reply_markup=reply_markup_p2)
+    except Exception as e:
+        await query.message.reply_text("An error occurred while starting the game.")
+        print(f"Error in start_multiplayer_game: {e}")
 
 # Handle multiplayer move
-async def multiplayer_move(update: Update) -> None:
-    query = update.callback_query
-    await query.answer()
-
-    # Extracting player choice, name, and game ID from callback data
-    try:
-        player_choice = query.data.split('_')[1]
-        player_name = query.data.split('_')[2]
-        game_id = query.data.split('_')[-1]
-    except IndexError:
-        await query.edit_message_text("Invalid callback data. Please try again.")
-        return
-
-    # Fetch the game from the database
-    game = get_game_from_db(game_id)
-    if game is None:
-        await query.edit_message_text("This game is no longer available.")
-        return
-
-    # Initialize multiplayer moves if not present or not a dictionary
-    if 'multiplayer_moves' not in game or not isinstance(game['multiplayer_moves'], dict):
-        game['multiplayer_moves'] = {}
-
-    # Store the player's choice
-    game['multiplayer_moves'][player_name] = player_choice
-    update_game_in_db(game_id, game)
-
-    # Check if both players have made their moves
-    if len(game['multiplayer_moves']) < 2:
-        await query.edit_message_text(f"{player_name} has made their move. Waiting for the other player...")
-        return
-
-    # Retrieve players and their moves
-    player1, player2 = list(game['multiplayer_moves'].keys())
-    move1, move2 = game['multiplayer_moves'][player1], game['multiplayer_moves'][player2]
-
-    # Determine the winner
-    result1 = determine_winner(move1, move2)
-    result2 = determine_winner(move2, move1)
-
-    # Handle the end of the game
-    await handle_game_end(query, game_id, player1, move1, result1, player2, move2, result2)
-
 async def handle_multiplayer_move(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-
-    # Extract data from callback
     data = query.data.split('_')
-    move = data[0]  # rock, paper, or scissors
-    player = data[2]  # player1 or player2
-    game_id = data[3]  # game_id
+    move = data[0]  # 'r' for rock, 'p' for paper, 's' for scissors
+    player = data[2]  # Player ID
+    game_id = data[3]  # Game ID
 
-    # Ensure 'multiplayer_moves' exists
-    ensure_multiplayer_moves_exists(context, game_id)
+    try:
+        # Safely update the game state using locks
+        await update_game_safe(game_id, lambda game: game['multiplayer_moves'].update({player: move}))
 
-    # Register the player's move
-    context.user_data['multiplayer_moves'][game_id][player] = move
+        game = get_game_from_db(game_id)
+        if len(game['multiplayer_moves']) == 2:  # If both players have made their moves
+            player1, player2 = game['players']
+            move1, move2 = game['multiplayer_moves'][player1], game['multiplayer_moves'][player2]
+            result1 = determine_winner(move1, move2)
+            result2 = determine_winner(move2, move1)
+            await handle_game_end(query, game_id, player1, move1, result1, player2, move2, result2)
+        else:
+            await query.edit_message_text(f"{player} has made their move. Waiting for the other player...")
+    except Exception as e:
+        await query.message.reply_text("An error occurred while processing your move.")
+        print(f"Error in handle_multiplayer_move: {e}")
 
-    # Check if both players have made their move
-    moves = context.user_data['multiplayer_moves'][game_id]
-    if moves['player1'] and moves['player2']:
-        # Both players have made their moves, resolve the game
-        result = resolve_multiplayer_game(moves['player1'], moves['player2'])
-        await query.message.reply_text(f"Game Over! {result}")
-        context.user_data['multiplayer_moves'].pop(game_id, None)  # Remove game data after completion
-    else:
-        await query.answer("Waiting for the other player to make their move.")
-
-# Function to resolve the game outcome
-def resolve_multiplayer_game(move1: str, move2: str) -> str:
-    if move1 == move2:
-        return "It's a draw!"
-    elif (move1 == "rock" and move2 == "scissors") or (move1 == "scissors" and move2 == "paper") or (move1 == "paper" and move2 == "rock"):
-        return "Player 1 wins!"
-    else:
-        return "Player 2 wins!"
-
-
+# End the game and show results
 async def handle_game_end(query, game_id, player1, move1, result1, player2, move2, result2):
-    game = get_game_from_db(game_id)
-    if game is None:
-        game = {'multiplayer_moves': []}
-        save_game_to_db(game_id, game)
+    try:
+        await query.edit_message_text(
+            f"{player1} chose {move1}. {player2} chose {move2}.\n"
+            f"{player1}: {result1}\n{player2}: {result2}"
+        )
 
-    update_stats(player2, result2)
+        # Clean up the game after the round
+        game = get_game_from_db(game_id)
+        if game:
+            game['multiplayer_moves'].clear()
+            update_game_in_db(game_id, game)
 
-    keyboard = [
-        [InlineKeyboardButton("Play Again 🔄", callback_data=f'multiplayer_{game_id}')],
-        [InlineKeyboardButton("Check Stats 📊", callback_data='show_stats')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    message = (
-        f"{player1} chose {move1}. {player2} chose {move2}.\n"
-        f"{player1}: {result1}\n"
-        f"{player2}: {result2}"
-    )
-    
-    with contextlib.suppress(Exception):  # Handle Telegram errors gracefully
-        await query.edit_message_text(message, reply_markup=reply_markup)
-    
-    game['multiplayer_moves'].clear()
-    update_game_in_db(game_id, game)
-
-
-async def handle_player_move(query, context, game_id, player_name, player_choice):
-    game = get_game_from_db(game_id)
-    if game is None:
-        game = {'multiplayer_moves': {}}
-        save_game_to_db(game_id, game)
-
-    game['multiplayer_moves'][player_name] = player_choice
-    update_game_in_db(game_id, game)
-
-    if len(game['multiplayer_moves']) < 2:
-        await query.edit_message_text(f"{player_name} has made their move. Waiting for the other player...")
-        return
-
-    # Both players have made their moves
-    player1, player2 = list(game['multiplayer_moves'].keys())
-    move1, move2 = game['multiplayer_moves'][player1], game['multiplayer_moves'][player2]
-
-    result1 = determine_winner(move1, move2)
-    result2 = determine_winner(move2, move1)
-
-    await handle_game_end(query, game_id, player1, move1, result1, player2, move2, result2)
+        # Offer the option to play again or go back to the main menu
+        keyboard = [
+            [InlineKeyboardButton("Play Again 🔄", callback_data=f'multiplayer_{game_id}')],
+            [InlineKeyboardButton("Back to Menu", callback_data='main_menu')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.reply_text("Game Over!", reply_markup=reply_markup)
+    except Exception as e:
+        await query.message.reply_text("An error occurred while ending the game.")
+        print(f"Error in handle_game_end: {e}")
 
 
 
