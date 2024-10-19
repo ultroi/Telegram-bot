@@ -399,6 +399,51 @@ async def start_multiplayer_game(query: Update, context: ContextTypes.DEFAULT_TY
     await query.message.reply_text(f"{player2}, choose your move:", reply_markup=reply_markup_p2)
 
 
+# Handle multiplayer move
+async def multiplayer_move(update: Update) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    # Extracting player choice, name, and game ID from callback data
+    try:
+        player_choice = query.data.split('_')[1]
+        player_name = query.data.split('_')[2]
+        game_id = query.data.split('_')[-1]
+    except IndexError:
+        await query.edit_message_text("Invalid callback data. Please try again.")
+        return
+
+    # Fetch the game from the database
+    game = get_game_from_db(game_id)
+    if game is None:
+        await query.edit_message_text("This game is no longer available.")
+        return
+
+    # Initialize multiplayer moves if not present
+    if 'multiplayer_moves' not in game:
+        game['multiplayer_moves'] = {}
+
+    # Store the player's choice
+    game['multiplayer_moves'][player_name] = player_choice
+    update_game_in_db(game_id, game)
+
+    # Check if both players have made their moves
+    if len(game['multiplayer_moves']) < 2:
+        await query.edit_message_text(f"{player_name} has made their move. Waiting for the other player...")
+        return
+
+    # Retrieve players and their moves
+    player1, player2 = list(game['multiplayer_moves'].keys())
+    move1, move2 = game['multiplayer_moves'][player1], game['multiplayer_moves'][player2]
+
+    # Determine the winner
+    result1 = determine_winner(move1, move2)
+    result2 = determine_winner(move2, move1)
+
+    # Handle the end of the game
+    await handle_game_end(query, game_id, player1, move1, result1, player2, move2, result2)
+
+
 async def handle_game_end(query, game_id, player1, move1, result1, player2, move2, result2):
     game = get_game_from_db(game_id)
     if game is None:
@@ -448,50 +493,6 @@ async def handle_player_move(query, context, game_id, player_name, player_choice
 
     await handle_game_end(query, game_id, player1, move1, result1, player2, move2, result2)
 
-
-# Handle multiplayer move
-async def multiplayer_move(update: Update) -> None:
-    query = update.callback_query
-    await query.answer()
-
-    # Extracting player choice, name, and game ID from callback data
-    try:
-        player_choice = query.data.split('_')[1]
-        player_name = query.data.split('_')[2]
-        game_id = query.data.split('_')[-1]
-    except IndexError:
-        await query.edit_message_text("Invalid callback data. Please try again.")
-        return
-
-    # Fetch the game from the database
-    game = get_game_from_db(game_id)
-    if game is None:
-        await query.edit_message_text("This game is no longer available.")
-        return
-
-    # Initialize multiplayer moves if not present
-    if 'multiplayer_moves' not in game:
-        game['multiplayer_moves'] = {}
-
-    # Store the player's choice
-    game['multiplayer_moves'][player_name] = player_choice
-    update_game_in_db(game_id, game)
-
-    # Check if both players have made their moves
-    if len(game['multiplayer_moves']) < 2:
-        await query.edit_message_text(f"{player_name} has made their move. Waiting for the other player...")
-        return
-
-    # Retrieve players and their moves
-    player1, player2 = list(game['multiplayer_moves'].keys())
-    move1, move2 = game['multiplayer_moves'][player1], game['multiplayer_moves'][player2]
-
-    # Determine the winner
-    result1 = determine_winner(move1, move2)
-    result2 = determine_winner(move2, move1)
-
-    # Handle the end of the game
-    await handle_game_end(query, game_id, player1, move1, result1, player2, move2, result2)
 
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
