@@ -233,7 +233,7 @@ async def single_player_move(update: Update, _: ContextTypes.DEFAULT_TYPE) -> No
         f"**Bot chose:** {bot_choice} 🤖\n"
         f"**{result}** 🎉"
     )
-    await query.edit_message_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+    await query.message.reply_text(message, reply_markup=reply_markup, parse_mode='Markdown')
 
 
 # Start multiplayer mode (group-only)
