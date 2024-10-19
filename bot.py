@@ -375,12 +375,29 @@ async def join_multiplayer(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             await query.edit_message_text(new_text)
 
 
+def ensure_multiplayer_moves_exists(context: ContextTypes.DEFAULT_TYPE, game_id: str):
+    if 'multiplayer_moves' not in context.user_data:
+        context.user_data['multiplayer_moves'] = {}
+    if game_id not in context.user_data['multiplayer_moves']:
+        # Initialize empty moves for both players
+        context.user_data['multiplayer_moves'][game_id] = {'player1': None, 'player2': None}
+
+
 # Start multiplayer game
 async def start_multiplayer_game(query: Update, context: ContextTypes.DEFAULT_TYPE, game_id: str):
-    game = get_game_from_db(game_id)
+    # Ensure 'games' and 'multiplayer_moves' exist
+    ensure_games_exists(context)
+    ensure_multiplayer_moves_exists(context, game_id)
+
+    game = context.user_data['games'].get(game_id)
+
+    if not game:
+        await query.message.edit_text("Error starting the game. Please try again.")
+        return
+
     player1, player2 = game['players']
 
-    # Player 1's move
+    # Player 1's move options
     keyboard_p1 = [
         [InlineKeyboardButton("Rock 🪨", callback_data=f'rock_multiplayer_{player1}_{game_id}')],
         [InlineKeyboardButton("Paper 📄", callback_data=f'paper_multiplayer_{player1}_{game_id}')],
@@ -389,7 +406,7 @@ async def start_multiplayer_game(query: Update, context: ContextTypes.DEFAULT_TY
     reply_markup_p1 = InlineKeyboardMarkup(keyboard_p1)
     await query.message.reply_text(f"{player1}, choose your move:", reply_markup=reply_markup_p1)
 
-    # Player 2's move
+    # Player 2's move options
     keyboard_p2 = [
         [InlineKeyboardButton("Rock 🪨", callback_data=f'rock_multiplayer_{player2}_{game_id}')],
         [InlineKeyboardButton("Paper 📄", callback_data=f'paper_multiplayer_{player2}_{game_id}')],
@@ -397,6 +414,7 @@ async def start_multiplayer_game(query: Update, context: ContextTypes.DEFAULT_TY
     ]
     reply_markup_p2 = InlineKeyboardMarkup(keyboard_p2)
     await query.message.reply_text(f"{player2}, choose your move:", reply_markup=reply_markup_p2)
+
 
 
 # Handle multiplayer move
@@ -442,6 +460,40 @@ async def multiplayer_move(update: Update) -> None:
 
     # Handle the end of the game
     await handle_game_end(query, game_id, player1, move1, result1, player2, move2, result2)
+
+async def handle_multiplayer_move(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+
+    # Extract data from callback
+    data = query.data.split('_')
+    move = data[0]  # rock, paper, or scissors
+    player = data[2]  # player1 or player2
+    game_id = data[3]  # game_id
+
+    # Ensure 'multiplayer_moves' exists
+    ensure_multiplayer_moves_exists(context, game_id)
+
+    # Register the player's move
+    context.user_data['multiplayer_moves'][game_id][player] = move
+
+    # Check if both players have made their move
+    moves = context.user_data['multiplayer_moves'][game_id]
+    if moves['player1'] and moves['player2']:
+        # Both players have made their moves, resolve the game
+        result = resolve_multiplayer_game(moves['player1'], moves['player2'])
+        await query.message.reply_text(f"Game Over! {result}")
+        context.user_data['multiplayer_moves'].pop(game_id, None)  # Remove game data after completion
+    else:
+        await query.answer("Waiting for the other player to make their move.")
+
+# Function to resolve the game outcome
+def resolve_multiplayer_game(move1: str, move2: str) -> str:
+    if move1 == move2:
+        return "It's a draw!"
+    elif (move1 == "rock" and move2 == "scissors") or (move1 == "scissors" and move2 == "paper") or (move1 == "paper" and move2 == "rock"):
+        return "Player 1 wins!"
+    else:
+        return "Player 2 wins!"
 
 
 async def handle_game_end(query, game_id, player1, move1, result1, player2, move2, result2):
