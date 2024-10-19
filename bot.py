@@ -419,8 +419,8 @@ async def multiplayer_move(update: Update) -> None:
         await query.edit_message_text("This game is no longer available.")
         return
 
-    # Initialize multiplayer moves if not present
-    if 'multiplayer_moves' not in game:
+    # Initialize multiplayer moves if not present or not a dictionary
+    if 'multiplayer_moves' not in game or not isinstance(game['multiplayer_moves'], dict):
         game['multiplayer_moves'] = {}
 
     # Store the player's choice
