@@ -1,2 +1,3 @@
 pyrogram
-sqlite3
+python-dotenv
+tgcrypto

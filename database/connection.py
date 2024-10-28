@@ -35,8 +35,9 @@ def ensure_tables_exist():
             conn.commit()
         except sqlite3.Error as e:
             print(f"Error creating table: {e}")
+        finally:
+            cursor.close()
 
-# Example database interaction functions
 def get_game_from_db(game_id):
     with get_db_connection() as conn:
         cursor = conn.cursor()
