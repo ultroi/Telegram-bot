@@ -1,1 +1,2 @@
-   
+Stone Paper Scissor bot
+
