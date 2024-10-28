@@ -1,4 +1,2 @@
 pyrogram
-python-dotenv==1.0.0
-pyTelegramBotAPI
-Pillow
+sqlite3
