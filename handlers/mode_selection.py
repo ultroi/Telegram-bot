@@ -2,8 +2,8 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 app = Client("my_bot")
 from .multiplayer import start_multiplayer, join_multiplayer, handle_multiplayer_move, handle_game_end, matchmaking_process
-from .single_player import start_single_player
 from .show_stats import show_stats
+from .single_player import start_single_player
 from .help_command import help_command
 
 # Function to determine the bot's move
@@ -28,7 +28,7 @@ async def start(client, message):
     await message.reply("Welcome! Choose an option:", reply_markup=reply_markup)
 
 # Handler for the game moves
-@app.on_message(filters.text & ~filters.command)
+@app.on_message(filters.text & ~filters.command("start"))
 async def handle_move(client, message):
     player_move = message.text.lower()
     bot_move = determine_bot_move(player_move)

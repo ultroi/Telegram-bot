@@ -1,9 +1,9 @@
 import asyncio
-from pyrogram import Client
+from pyrogram import Client, filters, idle
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from database.cleanup import cleanup_inactive_users
 from database.connection import ensure_tables_exist
-from handlers import start, handle_move, handle_callback_query, show_stats, multiplayer, start_single_player, mode_selection, help
+from handlers import start, handle_move, handle_callback_query, show_stats, help, start_single_player
 from dotenv import load_dotenv
 import os
 
@@ -27,15 +27,15 @@ async def main():
     await app.start()
     
     # Register handlers
-    app.add_handler(MessageHandler(start))
-    app.add_handler(MessageHandler(handle_move))
+    app.add_handler(MessageHandler(start, filters.command("start")))
+    app.add_handler(MessageHandler(handle_move, filters.text & ~filters.command("start")))
     app.add_handler(CallbackQueryHandler(handle_callback_query))
-    app.add_handler(MessageHandler(show_stats))
-    app.add_handler(MessageHandler(help))
-    app.add_handler(MessageHandler(multiplayer))
-    app.add_handler(MessageHandler(start_single_player))
+    app.add_handler(MessageHandler(show_stats, filters.command("show_stats")))
+    app.add_handler(MessageHandler(help, filters.command("help")))
+    app.add_handler(MessageHandler(start_single_player, filters.command("single_player")))
     
-    await app.idle()
+    await idle()
+    await app.stop()
 
 if __name__ == "__main__":
     asyncio.run(main())

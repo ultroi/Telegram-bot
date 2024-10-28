@@ -32,6 +32,12 @@ def ensure_tables_exist():
                 ties INTEGER
             )
             ''')
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_activity (
+                user_id TEXT PRIMARY KEY,
+                last_active TIMESTAMP
+            )
+            ''')
             conn.commit()
         except sqlite3.Error as e:
             print(f"Error creating table: {e}")
