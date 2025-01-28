@@ -1,6 +1,6 @@
 import asyncio
-from pyrogram import Client, filters, idle
-from pyrogram.handlers import MessageHandler, CallbackQueryHandler
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from database.cleanup import cleanup_inactive_users
 from database.connection import ensure_tables_exist
 from handlers import start, handle_move, handle_callback_query, show_stats, help, start_single_player
@@ -12,30 +12,36 @@ load_dotenv()
 
 # Get credentials from environment variables
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-API_ID = os.getenv("API_ID")
-API_HASH = os.getenv("API_HASH")
 
-# Initialize the Pyrogram client
-app = Client("my_bot", bot_token=BOT_TOKEN, api_id=API_ID, api_hash=API_HASH)
+# Define a function to run periodic cleanup tasks
+async def cleanup_task():
+    while True:
+        await cleanup_inactive_users()
+        await asyncio.sleep(3600)  # Run cleanup every hour
 
-# Start the cleanup task
+# Main function to initialize the bot
 async def main():
+    # Ensure necessary database tables exist
     ensure_tables_exist()
-    asyncio.create_task(cleanup_inactive_users())
-    
-    # Add other startup tasks here
-    await app.start()
-    
-    # Register handlers
-    app.add_handler(MessageHandler(start, filters.command("start")))
-    app.add_handler(MessageHandler(handle_move, filters.text & ~filters.command("start")))
-    app.add_handler(CallbackQueryHandler(handle_callback_query))
-    app.add_handler(MessageHandler(show_stats, filters.command("show_stats")))
-    app.add_handler(MessageHandler(help, filters.command("help")))
-    app.add_handler(MessageHandler(start_single_player, filters.command("single_player")))
-    
-    await idle()
-    await app.stop()
+
+    # Initialize the bot application
+    application = Application.builder().token(BOT_TOKEN).build()
+
+    # Register command handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("show_stats", show_stats))
+    application.add_handler(CommandHandler("help", help))
+    application.add_handler(CommandHandler("single_player", start_single_player))
+
+    # Register message and callback query handlers
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_move))
+    application.add_handler(CallbackQueryHandler(handle_callback_query))
+
+    # Start the cleanup task
+    asyncio.create_task(cleanup_task())
+
+    # Start the bot
+    await application.run_polling()
 
 if __name__ == "__main__":
     asyncio.run(main())
