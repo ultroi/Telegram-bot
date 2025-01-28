@@ -1,5 +1,5 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CallbackContext, Update, CommandHandler, CallbackQueryHandler
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CallbackContext, ContextTypes
 
 # Help command: Display available commands
 async def help_command(update: Update, context: CallbackContext):
