@@ -1,11 +1,10 @@
-import asyncio
+import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from database.cleanup import cleanup_inactive_users
 from database.connection import ensure_tables_exist
 from handlers import start, handle_move, handle_callback_query, show_stats, help, start_single_player
 from dotenv import load_dotenv
-import os
 
 # Load environment variables from .env file
 load_dotenv()
@@ -16,7 +15,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 # Main function to initialize the bot
 async def main():
     # Ensure necessary database tables exist
-    ensure_tables_exist()
+    await ensure_tables_exist()
 
     # Initialize the bot application
     application = Application.builder().token(BOT_TOKEN).build()
@@ -35,4 +34,6 @@ async def main():
     await application.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Directly run the main coroutine using asyncio's current event loop
+    import asyncio
+    asyncio.get_event_loop().run_until_complete(main())
