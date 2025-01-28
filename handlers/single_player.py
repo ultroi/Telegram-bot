@@ -23,7 +23,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("Help", callback_data='help')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Welcome! Choose an option:", reply_markup=reply_markup)
+    # Make sure `update.message` exists and is not None before calling `reply_text`
+    if update.message:
+        await update.message.reply_text("Welcome! Choose an option:", reply_markup=reply_markup)
+    else:
+        # Handling case where update.message is None
+        await update.callback_query.answer("Message not available.")
+
 
 # Handler for the game moves
 async def handle_move(update: Update, context: ContextTypes.DEFAULT_TYPE):
