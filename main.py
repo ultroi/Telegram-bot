@@ -16,9 +16,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 async def main():
     # Ensure necessary database tables exist
     await ensure_tables_exist()
-
-    # Initialize the bot application
-    application = Application.builder().token(BOT_TOKEN).build()
+    
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
 
     # Register command handlers
     application.add_handler(CommandHandler("start", start))
