@@ -13,12 +13,6 @@ load_dotenv()
 # Get credentials from environment variables
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# Define a function to run periodic cleanup tasks
-async def cleanup_task():
-    while True:
-        await cleanup_inactive_users()
-        await asyncio.sleep(3600)  # Run cleanup every hour
-
 # Main function to initialize the bot
 async def main():
     # Ensure necessary database tables exist
@@ -36,9 +30,6 @@ async def main():
     # Register message and callback query handlers
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_move))
     application.add_handler(CallbackQueryHandler(handle_callback_query))
-
-    # Start the cleanup task
-    asyncio.create_task(cleanup_task())
 
     # Start the bot
     await application.run_polling()
