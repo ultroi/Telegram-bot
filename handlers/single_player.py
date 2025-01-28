@@ -23,13 +23,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("Help", callback_data='help')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Welcome! Choose an option:", reply_markup=reply_markup)
+    update.message.reply_text("Welcome! Choose an option:", reply_markup=reply_markup)
 
 # Handler for the game moves
 async def handle_move(update: Update, context: ContextTypes.DEFAULT_TYPE):
     player_move = update.message.text.lower()
     bot_move = determine_bot_move(player_move)
-    await update.message.reply_text(f"You chose {player_move}, I chose {bot_move}.")
+    update.message.reply_text(f"You chose {player_move}, I chose {bot_move}.")
 
 # Start single-player mode
 async def start_single_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
