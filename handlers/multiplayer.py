@@ -1,5 +1,5 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Updater
+from telegram.ext import CallbackContext
 from database import get_game_from_db, save_game_to_db, update_game_in_db, get_db_connection
 import asyncio
 
