@@ -1,6 +1,6 @@
 import os
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from database.cleanup import cleanup_inactive_users
 from database.connection import ensure_tables_exist
 from handlers import start, handle_move, handle_callback_query, show_stats, help, start_single_player
