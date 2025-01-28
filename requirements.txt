@@ -2,3 +2,4 @@ pyrogram
 python-telegram-bot
 python-dotenv
 tgcrypto
+aiosqlite
