@@ -1,7 +1,8 @@
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CallbackContext, Update, CommandHandler, CallbackQueryHandler
 
 # Help command: Display available commands
-async def help_command(client, message):
+async def help_command(update: Update, context: CallbackContext):
     help_message = (
         "Help Menu:\n\n"
         "Here are the available commands:\n"
@@ -18,10 +19,10 @@ async def help_command(client, message):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await message.reply_text(help_message, reply_markup=reply_markup)
+    await update.message.reply_text(help_message, reply_markup=reply_markup)
 
 # Display developer commands
-async def show_dev_commands(client, message):
+async def show_dev_commands(update: Update, context: CallbackContext):
     dev_commands_message = (
         "Developer Commands:\n\n"
         "/ban <user_id> - Ban a user from using the bot\n"
@@ -30,4 +31,13 @@ async def show_dev_commands(client, message):
         "Use these commands responsibly!"
     )
 
-    await message.reply_text(dev_commands_message)
+    await update.message.reply_text(dev_commands_message)
+
+# Callback query handler for showing dev commands
+async def handle_callback_query(update: Update, context: CallbackContext):
+    query = update.callback_query
+    if query.data == 'dev_commands':
+        await show_dev_commands(update, context)
+    elif query.data == 'main_menu':
+        # Handle going back to the main menu if needed
+        pass  # Your implementation here
