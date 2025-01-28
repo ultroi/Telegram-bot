@@ -15,7 +15,7 @@ def determine_bot_move(player_move):
         return 'rock'
 
 # Handler for the /start command
-def start(update: Update, context):
+async def start(update: Update, context):
     keyboard = [
         [InlineKeyboardButton("Single Player", callback_data='single_player')],
         [InlineKeyboardButton("Multiplayer", callback_data='multiplayer')],
@@ -26,13 +26,13 @@ def start(update: Update, context):
     update.message.reply_text("Welcome! Choose an option:", reply_markup=reply_markup)
 
 # Handler for the game moves
-def handle_move(update: Update, context):
+async def handle_move(update: Update, context):
     player_move = update.message.text.lower()
     bot_move = determine_bot_move(player_move)
     update.message.reply_text(f"You chose {player_move}, I chose {bot_move}.")
 
 # Callback query handler
-def handle_callback_query(update: Update, context):
+async def handle_callback_query(update: Update, context):
     query = update.callback_query
     if query.data == 'single_player':
         start_single_player(update, context)
