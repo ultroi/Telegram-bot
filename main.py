@@ -29,6 +29,9 @@ async def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_move))
     application.add_handler(CallbackQueryHandler(handle_callback_query))
 
+    # Start the bot
+    await application.run_polling()
 
 if __name__ == "__main__":
-    application.run_polling()
+    import asyncio
+    asyncio.get_event_loop().run_until_complete(main())
