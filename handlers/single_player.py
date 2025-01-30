@@ -5,15 +5,6 @@ from .show_stats import show_stats
 from .help_command import help_command
 import random
 
-# Function to determine the bot's move
-def determine_bot_move(player_move):
-    if player_move == 'rock':
-        return 'paper'
-    elif player_move == 'paper':
-        return 'scissors'
-    else:
-        return 'rock'
-
 # Handler for the /start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
@@ -23,19 +14,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("Help", callback_data='help')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    # Make sure `update.message` exists and is not None before calling `reply_text`
-    if update.message:
-        await update.message.reply_text("Welcome! Choose an option:", reply_markup=reply_markup)
-    else:
-        # Handling case where update.message is None
-        await update.callback_query.answer("Message not available.")
-
-
-# Handler for the game moves
-async def handle_move(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    player_move = update.message.text.lower()
-    bot_move = determine_bot_move(player_move)
-    await update.message.reply_text(f"You chose {player_move}, I chose {bot_move}.")
+    await update.message.reply_text("Welcome! Choose an option:", reply_markup=reply_markup)
 
 # Start single-player mode
 async def start_single_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -57,8 +36,8 @@ async def single_player_move(update: Update, context: ContextTypes.DEFAULT_TYPE)
     bot_choice = random.choice(['rock', 'paper', 'scissors'])
     result = determine_winner(player_choice, bot_choice)
 
-    # Placeholder for update_stats function
-    # update_stats(query.from_user.id, result)
+    # Update user stats (implement your update_stats function)
+    # await update_stats(query.from_user.id, result)
 
     keyboard = [
         [InlineKeyboardButton("Play Again 🔄", callback_data='single_player')],
@@ -71,7 +50,7 @@ async def single_player_move(update: Update, context: ContextTypes.DEFAULT_TYPE)
         f"**Bot chose:** {bot_choice} 🤖\n"
         f"**{result}** 🎉"
     )
-    await query.message.reply_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+    await query.edit_message_text(text=message, reply_markup=reply_markup, parse_mode='Markdown')
 
 # Determine the winner of the game
 def determine_winner(player_choice, opponent_choice):
