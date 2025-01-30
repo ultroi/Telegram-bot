@@ -5,16 +5,6 @@ from .show_stats import show_stats
 from .help_command import help_command
 import random
 
-# Handler for the /start command
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("Single Player", callback_data='single_player')],
-        [InlineKeyboardButton("Multiplayer", callback_data='multiplayer')],
-        [InlineKeyboardButton("Show Stats", callback_data='show_stats')],
-        [InlineKeyboardButton("Help", callback_data='help')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Welcome! Choose an option:", reply_markup=reply_markup)
 
 # Start single-player mode
 async def start_single_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
