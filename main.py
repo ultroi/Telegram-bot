@@ -3,7 +3,7 @@ import logging
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from database.connection import ensure_tables_exist
-from .handlers.start import start
+from handlers.start import start
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
