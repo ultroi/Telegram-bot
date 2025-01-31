@@ -1,5 +1,5 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
+from telegram.ext import ContextTypes, CallbackQueryHandler
 from database.connections import ensure_tables_exist, update_stats
 import random
 
