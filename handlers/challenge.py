@@ -14,6 +14,18 @@ async def clear_ongoing_challenges():
     ongoing_challenges.clear()
     print("All ongoing challenges have been cleared.")
 
+async def clear_challenges_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Command to clear all ongoing challenges."""
+    # Optional: Restrict this command to admins or specific users
+    admin_id = 5956598856
+    if update.message.from_user.id != admin_id:
+        await update.message.reply_text("You are not authorized to use this command.")
+        return
+
+    clear_ongoing_challenges()
+    await update.message.reply_text("All ongoing challenges have been cleared.")
+
+
 
 async def challenge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check if the command is used in a private chat
