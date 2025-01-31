@@ -65,13 +65,29 @@ async def update_stats(user_id, first_name, last_name, profile_link, result, is_
                     total_losses += 1
                     if is_challenge:
                         challenge_losses += 1
-                await conn.execute('UPDATE stats SET first_name = ?, last_name = ?, profile_link = ?, total_wins = ?, total_losses = ?, challenge_wins = ?, challenge_losses = ? WHERE user_id = ?', 
-                                   (first_name, last_name, profile_link, total_wins, total_losses, challenge_wins, challenge_losses, user_id))
+                await conn.execute('''UPDATE stats SET 
+                    first_name = ?, last_name = ?, profile_link = ?, 
+                    total_wins = ?, total_losses = ?, 
+                    challenge_wins = ?, challenge_losses = ? 
+                    WHERE user_id = ?''', 
+                    (first_name, last_name, profile_link, 
+                     total_wins, total_losses, 
+                     challenge_wins, challenge_losses, 
+                     user_id))
             else:
                 if result == 'win':
-                    await conn.execute('INSERT INTO stats (user_id, first_name, last_name, profile_link, total_wins, total_losses, challenge_wins, challenge_losses) VALUES (?, ?, ?, ?, 1, 0, ?, ?)', 
-                                       (user_id, first_name, last_name, profile_link, 1 if is_challenge else 0, 0))
+                    await conn.execute('''INSERT INTO stats 
+                        (user_id, first_name, last_name, profile_link, 
+                        total_wins, total_losses, challenge_wins, challenge_losses) 
+                        VALUES (?, ?, ?, ?, 1, 0, ?, ?)''', 
+                        (user_id, first_name, last_name, profile_link, 
+                         1 if is_challenge else 0, 0))
                 elif result == 'loss':
-                    await conn.execute('INSERT INTO stats (user_id, first_name, last_name, profile_link, total_wins, total_losses, challenge_wins, challenge_losses) VALUES (?, ?, ?, ?, 0, 1, 0, ?)', 
-                                       (user_id, first_name, last_name, profile_link, 1 if is_challenge else 0))
+                    await conn.execute('''INSERT INTO stats 
+                        (user_id, first_name, last_name, profile_link, 
+                        total_wins, total_losses, challenge_wins, challenge_losses) 
+                        VALUES (?, ?, ?, ?, 0, 1, 0, ?)''', 
+                        (user_id, first_name, last_name, profile_link, 
+                         1 if is_challenge else 0))
         await conn.commit()
+
