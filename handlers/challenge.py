@@ -9,15 +9,16 @@ GAME_CHOICES = ["🪨 Rock", "📄 Paper", "✂️ Scissor"]
 ongoing_challenges = {}
 
 # Function to determine the winner of a round
-def determine_winner(user_choice, bot_choice):
-    if user_choice == bot_choice:
+def determine_winner(player1_choice, player2_choice):
+    if player1_choice == player2_choice:
         return "tie"
-    elif (user_choice == "🪨 Rock" and bot_choice == "✂️ Scissor") or \
-         (user_choice == "📄 Paper" and bot_choice == "🪨 Rock") or \
-         (user_choice == "✂️ Scissor" and bot_choice == "📄 Paper"):
-        return "user"
+    elif (player1_choice == "🪨 Rock" and player2_choice == "✂️ Scissor") or \
+         (player1_choice == "📄 Paper" and player2_choice == "🪨 Rock") or \
+         (player1_choice == "✂️ Scissor" and player2_choice == "📄 Paper"):
+        return "user"  # Challenger wins
     else:
-        return "bot"
+        return "challenged"  # Challenged player wins
+
 
 async def challenge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Debug: Print the message and reply_to_message
@@ -101,9 +102,8 @@ async def start_challenge(query, challenge_data):
     challenger = challenge_data["challenger"]
     challenged = challenge_data["challenged"]
 
-    # Send initial challenge message
     message = await query.edit_message_text(
-        f"🎮 {challenger.first_name} vs {challenged.first_name} 🎮\n"
+        f"\U0001F3AE {challenger.first_name} vs {challenged.first_name} \U0001F3AE\n"
         f"Round 1\n\n"
         f"Score:\n"
         f"{challenger.first_name}: 0\n"
@@ -111,22 +111,31 @@ async def start_challenge(query, challenge_data):
         f"{challenger.first_name}'s turn!"
     )
 
-    # Store the message ID for future updates
     challenge_data["message_id"] = message.message_id
     challenge_data["current_player"] = challenger.id
 
-    # Send move buttons for the current player
+    await send_move_buttons(query, challenger)
+
+# Send move buttons
+async def send_move_buttons(query, player):
     keyboard = [
-        [InlineKeyboardButton("🪨 Rock", callback_data=f"move_🪨 Rock_{challenge_data['challenger'].id}")],
-        [InlineKeyboardButton("📄 Paper", callback_data=f"move_📄 Paper_{challenge_data['challenger'].id}")],
-        [InlineKeyboardButton("✂️ Scissor", callback_data=f"move_✂️ Scissor_{challenge_data['challenger'].id}")]
+        [InlineKeyboardButton("\U0001FAA8 Rock", callback_data=f"move_rock_{player.id}")],
+        [InlineKeyboardButton("\U0001F4C4 Paper", callback_data=f"move_paper_{player.id}")],
+        [InlineKeyboardButton("\u2702 Scissor", callback_data=f"move_scissor_{player.id}")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.message.reply_text(f"{player.first_name}, choose your move:", reply_markup=reply_markup)
 
-    await query.message.reply_text(
-        f"{challenger.first_name}, choose your move:",
-        reply_markup=reply_markup
-    )
+# Determine winner function
+def determine_winner(player1_choice, player2_choice):
+    if player1_choice == player2_choice:
+        return "tie"
+    elif (player1_choice == "rock" and player2_choice == "scissor") or \
+         (player1_choice == "paper" and player2_choice == "rock") or \
+         (player1_choice == "scissor" and player2_choice == "paper"):
+        return "user"  # Challenger wins
+    else:
+        return "challenged"  # Challenged player wins
 
 # Callback handler for game moves
 async def move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -138,12 +147,7 @@ async def move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = query.from_user
 
     # Find the challenge
-    challenge_id = None
-    for key, data in ongoing_challenges.items():
-        if data["current_player"] == user_id:
-            challenge_id = key
-            break
-
+    challenge_id = next((key for key, data in ongoing_challenges.items() if data["current_player"] == user_id), None)
     if not challenge_id:
         await query.answer("It's not your turn!")
         return
@@ -152,24 +156,13 @@ async def move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     challenger = challenge_data["challenger"]
     challenged = challenge_data["challenged"]
 
-    # Store the move for the player
     if user.id == challenger.id:
         challenge_data["challenger_move"] = user_choice
-        challenge_data["current_player"] = challenged.id  # Now it's the challenged player's turn
-
+        challenge_data["current_player"] = challenged.id
         await query.edit_message_text(f"{challenger.first_name} has made a move! Now it's {challenged.first_name}'s turn.")
-
-        # Send move buttons for the next player
-        keyboard = [
-            [InlineKeyboardButton("🪨 Rock", callback_data=f"move_🪨 Rock_{challenged.id}")],
-            [InlineKeyboardButton("📄 Paper", callback_data=f"move_📄 Paper_{challenged.id}")],
-            [InlineKeyboardButton("✂️ Scissor", callback_data=f"move_✂️ Scissor_{challenged.id}")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await query.message.reply_text(f"{challenged.first_name}, choose your move:", reply_markup=reply_markup)
+        await send_move_buttons(query, challenged)
         return
-
+    
     elif user.id == challenged.id:
         challenge_data["challenged_move"] = user_choice
 
@@ -179,40 +172,38 @@ async def move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if result == "user":
             challenge_data["challenger_score"] += 1
             round_winner = challenger.first_name
-        elif result == "bot":
+        elif result == "challenged":
             challenge_data["challenged_score"] += 1
             round_winner = challenged.first_name
         else:
             round_winner = "It's a tie!"
 
-        # Update the challenge message
+        # Update message with round results
         await query.edit_message_text(
-            f"🎮 {challenger.first_name} vs {challenged.first_name} 🎮\n"
+            f"\U0001F3AE {challenger.first_name} vs {challenged.first_name} \U0001F3AE\n"
             f"Round {challenge_data['current_round']}\n\n"
             f"Score:\n"
             f"{challenger.first_name}: {challenge_data['challenger_score']}\n"
             f"{challenged.first_name}: {challenge_data['challenged_score']}\n\n"
             f"{challenger.first_name} chose {challenge_data['challenger_move']}\n"
             f"{challenged.first_name} chose {challenge_data['challenged_move']}\n\n"
-            f"🏆 {round_winner} wins this round! 🏆"
+            f"\U0001F3C6 {round_winner} wins this round! \U0001F3C6"
         )
 
-        # Check if all rounds are completed
+        # Check if the game is over
         if challenge_data["current_round"] == challenge_data["rounds"]:
             final_winner = (
-                challenger.first_name
-                if challenge_data["challenger_score"] > challenge_data["challenged_score"]
-                else challenged.first_name
-                if challenge_data["challenger_score"] < challenge_data["challenged_score"]
+                challenger.first_name if challenge_data["challenger_score"] > challenge_data["challenged_score"]
+                else challenged.first_name if challenge_data["challenger_score"] < challenge_data["challenged_score"]
                 else "It's a tie!"
             )
 
             await query.message.reply_text(
-                f"🎮 {challenger.first_name} vs {challenged.first_name} 🎮\n"
+                f"\U0001F3AE {challenger.first_name} vs {challenged.first_name} \U0001F3AE\n"
                 f"Final Score:\n"
                 f"{challenger.first_name}: {challenge_data['challenger_score']}\n"
                 f"{challenged.first_name}: {challenge_data['challenged_score']}\n\n"
-                f"🏆 {final_winner} wins the challenge! 🏆"
+                f"\U0001F3C6 {final_winner} wins the challenge! \U0001F3C6"
             )
             del ongoing_challenges[challenge_id]
             return
@@ -220,25 +211,7 @@ async def move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Move to next round
         challenge_data["current_round"] += 1
         challenge_data["current_player"] = challenger.id  # Next round starts with challenger
-
-        # Clear previous round moves
         del challenge_data["challenger_move"]
         del challenge_data["challenged_move"]
-
-        # Notify for next round
-        await query.message.reply_text(
-            f"🎮 {challenger.first_name} vs {challenged.first_name} 🎮\n"
-            f"Round {challenge_data['current_round']}\n\n"
-            f"{challenger.first_name}, it's your turn!"
-        )
-
-        # Send buttons for challenger
-        keyboard = [
-            [InlineKeyboardButton("🪨 Rock", callback_data=f"move_🪨 Rock_{challenger.id}")],
-            [InlineKeyboardButton("📄 Paper", callback_data=f"move_📄 Paper_{challenger.id}")],
-            [InlineKeyboardButton("✂️ Scissor", callback_data=f"move_✂️ Scissor_{challenger.id}")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await query.message.reply_text(f"{challenger.first_name}, choose your move:", reply_markup=reply_markup)
-
+        await query.message.reply_text(f"Round {challenge_data['current_round']}! {challenger.first_name}, it's your turn!")
+        await send_move_buttons(query, challenger)
