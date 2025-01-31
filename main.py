@@ -4,6 +4,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from database.connection import ensure_tables_exist
 from handlers.start import start
+from handlers.play import play, button_callback
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -25,6 +26,8 @@ application = ApplicationBuilder().token(BOT_TOKEN).build()
 
 # Register command handlers
 application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("play", play))
+application.add_handler(CallbackQueryHandler(button_callback))
 
 # Error handler
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
