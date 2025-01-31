@@ -1,6 +1,6 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
-from database.connections import get_db_connection, ensure_tables_exist, update_stats
+from database.connection import get_db_connection, ensure_tables_exist, update_stats
 import random
 
 # Game configuration
