@@ -1,10 +1,6 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext, ContextTypes
-from .multiplayer import start_multiplayer, join_multiplayer, handle_multiplayer_move, handle_game_end, matchmaking_process
-from .show_stats import show_stats
-from .help_command import help_command
 import random
-
 
 # Start single-player mode
 async def start_single_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -26,9 +22,6 @@ async def single_player_move(update: Update, context: ContextTypes.DEFAULT_TYPE)
     player_choice = query.data.split('_')[0]  # e.g., 'rock_bot' -> 'rock'
     bot_choice = random.choice(['rock', 'paper', 'scissors'])
     result = determine_winner(player_choice, bot_choice)
-
-    # Update user stats (implement your update_stats function)
-    # await update_stats(query.from_user.id, result)
 
     # Prepare the result message
     message = (
@@ -55,19 +48,3 @@ def determine_winner(player_choice, opponent_choice):
         'scissors': {'rock': 'You lose!', 'paper': 'You win!', 'scissors': 'It\'s a tie!'}
     }
     return outcomes[player_choice][opponent_choice]
-
-# Callback query handler
-async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    if query.data == 'single_player':
-        await start_single_player(update, context)
-    elif query.data in ['rock_bot', 'paper_bot', 'scissors_bot']:
-        await single_player_move(update, context)
-    elif query.data == 'multiplayer':
-        await start_multiplayer(update, context)
-    elif query.data == 'show_stats':
-        await show_stats(update, context)
-    elif query.data == 'help':
-        await help_command(update, context)
