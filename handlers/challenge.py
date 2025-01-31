@@ -1,24 +1,11 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler, MessageHandler, filters
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
+from database.connections import ensure_tables_exist, update_stats
 import random
 
-# Game choices
+# Game configuration
 GAME_CHOICES = ["🪨 Rock", "📄 Paper", "✂️ Scissor"]
-
-# Dictionary to store ongoing challenges
 ongoing_challenges = {}
-
-# Function to determine the winner of a round
-def determine_winner(player1_choice, player2_choice):
-    if player1_choice == player2_choice:
-        return "tie"
-    elif (player1_choice == "🪨 Rock" and player2_choice == "✂️ Scissor") or \
-         (player1_choice == "📄 Paper" and player2_choice == "🪨 Rock") or \
-         (player1_choice == "✂️ Scissor" and player2_choice == "📄 Paper"):
-        return "user"  # Challenger wins
-    else:
-        return "challenged"  # Challenged player wins
-
 
 async def challenge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Debug: Print the message and reply_to_message
@@ -146,7 +133,6 @@ async def move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = int(user_id)
     user = query.from_user
 
-    # Find the challenge
     challenge_id = next((key for key, data in ongoing_challenges.items() if data["current_player"] == user_id), None)
     if not challenge_id:
         await query.answer("It's not your turn!")
@@ -156,7 +142,6 @@ async def move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     challenger = challenge_data["challenger"]
     challenged = challenge_data["challenged"]
 
-    # Store the move of the current player
     if user.id == challenger.id:
         challenge_data["challenger_move"] = user_choice
         challenge_data["current_player"] = challenged.id
@@ -167,7 +152,6 @@ async def move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif user.id == challenged.id:
         challenge_data["challenged_move"] = user_choice
 
-        # Both players have made their moves, determine the winner
         result = determine_winner(challenge_data["challenger_move"], challenge_data["challenged_move"])
 
         if result == "user":
@@ -179,7 +163,6 @@ async def move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             round_winner = "It's a tie!"
 
-        # Update message with round results
         await query.edit_message_text(
             f"\U0001F3AE {challenger.first_name} vs {challenged.first_name} \U0001F3AE\n"
             f"Round {challenge_data['current_round']}\n\n"
@@ -191,27 +174,58 @@ async def move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"\U0001F3C6 {round_winner} wins this round! \U0001F3C6"
         )
 
-        # Check if the game is over
         if challenge_data["current_round"] == challenge_data["rounds"]:
-            final_winner = (
-                challenger.first_name if challenge_data["challenger_score"] > challenge_data["challenged_score"]
-                else challenged.first_name if challenge_data["challenger_score"] < challenge_data["challenged_score"]
-                else "It's a tie!"
-            )
+            challenger_score = challenge_data["challenger_score"]
+            challenged_score = challenge_data["challenged_score"]
+
+            if challenger_score > challenged_score:
+                winner_user = challenger
+                loser_user = challenged
+                final_winner_text = f"{winner_user.first_name} wins the challenge!"
+            elif challenged_score > challenger_score:
+                winner_user = challenged
+                loser_user = challenger
+                final_winner_text = f"{winner_user.first_name} wins the challenge!"
+            else:
+                winner_user = None
+                loser_user = None
+                final_winner_text = "It's a tie!"
 
             await query.message.reply_text(
                 f"\U0001F3AE {challenger.first_name} vs {challenged.first_name} \U0001F3AE\n"
                 f"Final Score:\n"
-                f"{challenger.first_name}: {challenge_data['challenger_score']}\n"
-                f"{challenged.first_name}: {challenge_data['challenged_score']}\n\n"
-                f"\U0001F3C6 {final_winner} wins the challenge! \U0001F3C6"
+                f"{challenger.first_name}: {challenger_score}\n"
+                f"{challenged.first_name}: {challenged_score}\n\n"
+                f"\U0001F3C6 {final_winner_text} \U0001F3C6"
             )
+
+            if winner_user and loser_user:
+                # Update winner
+                winner_profile = f"t.me/{winner_user.username}" if winner_user.username else None
+                await update_stats(
+                    user_id=str(winner_user.id),
+                    first_name=winner_user.first_name,
+                    last_name=winner_user.last_name or '',
+                    profile_link=winner_profile,
+                    result='win',
+                    is_challenge=True
+                )
+                # Update loser
+                loser_profile = f"t.me/{loser_user.username}" if loser_user.username else None
+                await update_stats(
+                    user_id=str(loser_user.id),
+                    first_name=loser_user.first_name,
+                    last_name=loser_user.last_name or '',
+                    profile_link=loser_profile,
+                    result='loss',
+                    is_challenge=True
+                )
+
             del ongoing_challenges[challenge_id]
             return
 
-        # Move to next round
         challenge_data["current_round"] += 1
-        challenge_data["current_player"] = challenger.id  # Next round starts with challenger
+        challenge_data["current_player"] = challenger.id
         del challenge_data["challenger_move"]
         del challenge_data["challenged_move"]
         await query.message.reply_text(f"Round {challenge_data['current_round']}! {challenger.first_name}, it's your turn!")
