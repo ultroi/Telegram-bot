@@ -7,6 +7,14 @@ import random
 GAME_CHOICES = ["🪨 Rock", "📄 Paper", "✂️ Scissor"]
 ongoing_challenges = {}
 
+# Function to clear ongoing challenges
+async def clear_ongoing_challenges():
+    """Clear all ongoing challenges from memory."""
+    global ongoing_challenges
+    ongoing_challenges.clear()
+    print("All ongoing challenges have been cleared.")
+
+
 async def challenge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check if the command is used in a private chat
     if update.message.chat.type == "private":
