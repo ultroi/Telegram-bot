@@ -128,7 +128,6 @@ async def start_challenge(query, challenge_data):
         reply_markup=reply_markup
     )
 
-
 # Callback handler for game moves
 async def move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -153,27 +152,28 @@ async def move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     challenger = challenge_data["challenger"]
     challenged = challenge_data["challenged"]
 
-    # Store the move
-    if "challenger_move" not in challenge_data and user.id == challenger.id:
+    # Store the move for the player
+    if user.id == challenger.id:
         challenge_data["challenger_move"] = user_choice
-        challenge_data["current_player"] = challenged.id  # Switch turn
+        challenge_data["current_player"] = challenged.id  # Now it's the challenged player's turn
+
         await query.edit_message_text(f"{challenger.first_name} has made a move! Now it's {challenged.first_name}'s turn.")
-        
-        # Send buttons for the next player
+
+        # Send move buttons for the next player
         keyboard = [
             [InlineKeyboardButton("🪨 Rock", callback_data=f"move_🪨 Rock_{challenged.id}")],
             [InlineKeyboardButton("📄 Paper", callback_data=f"move_📄 Paper_{challenged.id}")],
             [InlineKeyboardButton("✂️ Scissor", callback_data=f"move_✂️ Scissor_{challenged.id}")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
+
         await query.message.reply_text(f"{challenged.first_name}, choose your move:", reply_markup=reply_markup)
         return
 
-    elif "challenger_move" in challenge_data and user.id == challenged.id:
+    elif user.id == challenged.id:
         challenge_data["challenged_move"] = user_choice
 
-        # Determine winner
+        # Both players have made their moves, determine the winner
         result = determine_winner(challenge_data["challenger_move"], challenge_data["challenged_move"])
 
         if result == "user":
@@ -219,7 +219,7 @@ async def move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Move to next round
         challenge_data["current_round"] += 1
-        challenge_data["current_player"] = challenger.id  # Start next round with challenger
+        challenge_data["current_player"] = challenger.id  # Next round starts with challenger
 
         # Clear previous round moves
         del challenge_data["challenger_move"]
@@ -241,3 +241,4 @@ async def move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         await query.message.reply_text(f"{challenger.first_name}, choose your move:", reply_markup=reply_markup)
+
