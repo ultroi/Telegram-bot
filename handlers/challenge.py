@@ -19,8 +19,11 @@ def determine_winner(user_choice, bot_choice):
     else:
         return "bot"
 
-# Command handler for /challenge
 async def challenge(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Debug: Print the message and reply_to_message
+    print(f"Message: {update.message.text}")
+    print(f"Reply to Message: {update.message.reply_to_message}")
+
     if not update.message.reply_to_message:
         await update.message.reply_text("Please reply to a user's message to challenge them.")
         return
@@ -37,6 +40,10 @@ async def challenge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     challenger = update.message.from_user
     challenged = update.message.reply_to_message.from_user
 
+    # Debug: Print challenger and challenged details
+    print(f"Challenger: {challenger.first_name} (ID: {challenger.id})")
+    print(f"Challenged: {challenged.first_name} (ID: {challenged.id})")
+
     if challenger.id == challenged.id:
         await update.message.reply_text("You cannot challenge yourself!")
         return
@@ -52,6 +59,9 @@ async def challenge(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "challenged_score": 0,
         "status": "pending"
     }
+
+    # Debug: Print ongoing_challenges
+    print(f"Ongoing Challenges: {ongoing_challenges}")
 
     # Send challenge message with Accept/Decline buttons
     keyboard = [
