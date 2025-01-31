@@ -1,6 +1,6 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
-from database.connections import ensure_tables_exist, update_stats
+from database.connections import get_db_connection, ensure_tables_exist, update_stats
 import random
 
 # Game configuration
@@ -8,33 +8,53 @@ GAME_CHOICES = ["🪨 Rock", "📄 Paper", "✂️ Scissor"]
 ongoing_challenges = {}
 
 async def challenge(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Debug: Print the message and reply_to_message
-    print(f"Message: {update.message.text}")
-    print(f"Reply to Message: {update.message.reply_to_message}")
+    # Check if the command is used in a private chat
+    if update.message.chat.type == "private":
+        await update.message.reply_text("This command can only be used in groups.")
+        return
 
+    # Check if the command is used as a reply
     if not update.message.reply_to_message:
         await update.message.reply_text("Please reply to a user's message to challenge them.")
         return
 
+    # Get challenger and challenged users
+    challenger = update.message.from_user
+    challenged = update.message.reply_to_message.from_user
+
+    # Check if the challenger is trying to challenge themselves
+    if challenger.id == challenged.id:
+        await update.message.reply_text("You cannot challenge yourself!")
+        return
+
+    # Check if the challenged user is a bot
+    if challenged.is_bot:
+        await update.message.reply_text("You cannot challenge a bot!")
+        return
+
+    # Validate the number of rounds
     try:
         rounds = int(context.args[0]) if context.args else 1
-        if rounds < 1 or rounds > 10:
-            await update.message.reply_text("Number of rounds must be between 1 and 10.")
+        if not 1 <= rounds <= 10:
+            await update.message.reply_text("Number of rounds must be between 1-10.")
             return
     except (IndexError, ValueError):
         await update.message.reply_text("Usage: /challenge <rounds> (max 10)")
         return
 
-    challenger = update.message.from_user
-    challenged = update.message.reply_to_message.from_user
-
-    # Debug: Print challenger and challenged details
-    print(f"Challenger: {challenger.first_name} (ID: {challenger.id})")
-    print(f"Challenged: {challenged.first_name} (ID: {challenged.id})")
-
-    if challenger.id == challenged.id:
-        await update.message.reply_text("You cannot challenge yourself!")
-        return
+    # Save basic info of both users in the database
+    async with get_db_connection() as conn:
+        # Ensure both users exist in the database
+        for user in [challenger, challenged]:
+            await conn.execute('''
+                INSERT INTO users (user_id, first_name, last_name, username) 
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    first_name = excluded.first_name,
+                    last_name = excluded.last_name,
+                    username = excluded.username
+            ''', (user.id, user.first_name, user.last_name or "", user.username or ""))
+        await conn.commit()
 
     # Create challenge data
     challenge_id = f"{challenger.id}_{challenged.id}"
@@ -48,20 +68,16 @@ async def challenge(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "status": "pending"
     }
 
-    # Debug: Print ongoing_challenges
-    print(f"Ongoing Challenges: {ongoing_challenges}")
-
     # Send challenge message with Accept/Decline buttons
     keyboard = [
         [InlineKeyboardButton("✅ Accept", callback_data=f"accept_{challenge_id}")],
         [InlineKeyboardButton("❌ Decline", callback_data=f"decline_{challenge_id}")]
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
     await update.message.reply_text(
-        f"{challenged.first_name}, you have been challenged by {challenger.first_name} for {rounds} round(s)!",
-        reply_markup=reply_markup
+        f"{challenged.first_name}, you've been challenged by {challenger.first_name} for {rounds} round(s)!",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
 
 # Callback handler for Accept/Decline buttons
 async def challenge_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
