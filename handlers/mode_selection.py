@@ -6,6 +6,7 @@ from .single_player import start_single_player
 from .help_command import help_command
 import random
 
+
 # Handler for the /start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
@@ -16,13 +17,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Welcome! Choose an option:", reply_markup=reply_markup)
-
-# Handler for the game moves (if using text commands)
-async def handle_move(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    player_move = update.message.text.lower()
-    # Make bot moves random for fair gameplay
-    bot_move = random.choice(['rock', 'paper', 'scissors'])
-    await update.message.reply_text(f"You chose {player_move}, I chose {bot_move}.")
 
 # Callback query handler
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
