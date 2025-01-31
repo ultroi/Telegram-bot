@@ -156,13 +156,14 @@ async def move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     challenger = challenge_data["challenger"]
     challenged = challenge_data["challenged"]
 
+    # Store the move of the current player
     if user.id == challenger.id:
         challenge_data["challenger_move"] = user_choice
         challenge_data["current_player"] = challenged.id
         await query.edit_message_text(f"{challenger.first_name} has made a move! Now it's {challenged.first_name}'s turn.")
         await send_move_buttons(query, challenged)
         return
-    
+
     elif user.id == challenged.id:
         challenge_data["challenged_move"] = user_choice
 
