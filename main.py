@@ -33,10 +33,8 @@ application.add_handler(CommandHandler("start", start))
 application.add_handler(CommandHandler("show_stats", show_stats))
 application.add_handler(CommandHandler("help", help))
 application.add_handler(CommandHandler("single_player", start_single_player))
-
-# Register message and callback query handlers
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_move))
-application.add_handler(CallbackQueryHandler(handle_callback_query))
+application.add_handler(CallbackQueryHandler(handle_callback_query))  # Handle callback queries
+application.add_handler(CallbackQueryHandler(single_player_move, pattern="^(rock_bot|paper_bot|scissors_bot)$"))
 
 # Error handler
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
