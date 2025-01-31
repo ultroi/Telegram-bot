@@ -4,7 +4,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from database.cleanup import cleanup_inactive_users
 from database.connection import ensure_tables_exist
-from handlers.help_command import help_command, show_dev_command
+from handlers.help_command import help_command, show_dev_commands
 from handlers.mode_selection import start, handle_callback_query
 from handlers.single_player import start_single_player, single_player_move
 from handlers.show_stats import show_stats
