@@ -115,18 +115,32 @@ async def start_challenge(query, challenge_data):
     challenge_data["message_id"] = message.message_id
     challenge_data["current_player"] = challenger.id
 
+    # Send move buttons for the current player
+    keyboard = [
+        [InlineKeyboardButton("🪨 Rock", callback_data=f"move_🪨 Rock_{challenge_data['challenger'].id}")],
+        [InlineKeyboardButton("📄 Paper", callback_data=f"move_📄 Paper_{challenge_data['challenger'].id}")],
+        [InlineKeyboardButton("✂️ Scissor", callback_data=f"move_✂️ Scissor_{challenge_data['challenger'].id}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.message.reply_text(
+        f"{challenger.first_name}, choose your move:",
+        reply_markup=reply_markup
+    )
+
 # Callback handler for game moves
 async def move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    user_choice = query.data
+    _, user_choice, user_id = query.data.split("_")
+    user_id = int(user_id)
     user = query.from_user
 
     # Find the challenge
     challenge_id = None
     for key, data in ongoing_challenges.items():
-        if data["current_player"] == user.id:
+        if data["current_player"] == user_id:
             challenge_id = key
             break
 
@@ -184,7 +198,7 @@ async def move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             winner = "It's a tie!"
 
-        await query.edit_message_text(
+        await query.message.reply_text(
             f"🎮 {challenger.first_name} vs {challenged.first_name} 🎮\n"
             f"Final Score:\n"
             f"{challenger.first_name}: {challenge_data['challenger_score']}\n"
@@ -199,11 +213,24 @@ async def move_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     challenge_data["current_player"] = challenged.id if challenge_data["current_player"] == challenger.id else challenger.id
 
     # Update the message for the next round
-    await query.edit_message_text(
+    await query.message.reply_text(
         f"🎮 {challenger.first_name} vs {challenged.first_name} 🎮\n"
         f"Round {challenge_data['current_round']}\n\n"
         f"Score:\n"
         f"{challenger.first_name}: {challenge_data['challenger_score']}\n"
         f"{challenged.first_name}: {challenge_data['challenged_score']}\n\n"
         f"{challenger.first_name if challenge_data['current_player'] == challenger.id else challenged.first_name}'s turn!"
+    )
+
+    # Send move buttons for the next player
+    keyboard = [
+        [InlineKeyboardButton("🪨 Rock", callback_data=f"move_🪨 Rock_{challenge_data['current_player']}")],
+        [InlineKeyboardButton("📄 Paper", callback_data=f"move_📄 Paper_{challenge_data['current_player']}")],
+        [InlineKeyboardButton("✂️ Scissor", callback_data=f"move_✂️ Scissor_{challenge_data['current_player']}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.message.reply_text(
+        f"{challenger.first_name if challenge_data['current_player'] == challenger.id else challenged.first_name}, choose your move:",
+        reply_markup=reply_markup
     )
