@@ -209,6 +209,15 @@ async def update_group_activity(group_id, title, username=None, member_count=Non
         
         await conn.commit()
 
+async def remove_group(group_id):
+    """Remove a group when the bot is kicked or removed."""
+    async with get_db_connection() as conn:
+        await conn.execute('DELETE FROM groups WHERE group_id = ?', (group_id,))
+        await conn.execute('UPDATE game_history SET group_id = NULL WHERE group_id = ?', (group_id,))
+        await conn.commit()
+    print(f"Group ID {group_id} removed from database.")
+    
+
 async def update_stats(user_id, game_type, result, move=None):
     """Update user challenge mode statistics after a game."""
     if game_type != 'challenge':
