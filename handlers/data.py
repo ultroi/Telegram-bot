@@ -120,7 +120,6 @@ async def delete_group_data(group_id: int) -> str:
             return f"⚠️ Error deleting group ID {group_id}: {e}"
 
 async def manage_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle the /manage_data command for database management."""
     user = update.effective_user
     if not await is_admin(user.id):
         await update.message.reply_text("🚫 You are not authorized to use this command.")
@@ -131,11 +130,11 @@ async def manage_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(
             "📊 <b>Data Management Command</b>\n\n"
             "Usage:\n"
-            "/manage_data wipe_all - Wipe all database data\n"
-            "/manage_data list_users - List all users\n"
-            "/manage_data list_groups - List all groups\n"
-            "/manage_data delete_user <user_id> - Delete specific user data\n"
-            "/manage_data delete_group <group_id> - Delete specific group data\n\n"
+            "/mdata wipe_all - Wipe all database data\n"
+            "/mdata list_users - List all users\n"
+            "/mdata list_groups - List all groups\n"
+            "/mdata delete_user <user_id> - Delete specific user data\n"
+            "/mdata delete_group <group_id> - Delete specific group data\n\n"
             "Please provide a valid action.",
             parse_mode="HTML"
         )
@@ -172,7 +171,6 @@ async def manage_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             return
         try:
             user_id = int(args[1])
-            # Create confirmation prompt
             keyboard = [
                 [
                     InlineKeyboardButton("✅ Confirm Delete", callback_data=f"confirm_delete_user_{user_id}_{user.id}"),
