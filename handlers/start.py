@@ -13,14 +13,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Interactive start command with UI for the Rock Paper Scissors bot."""
     user = update.message.from_user
     
-    # Ensure database tables exist
-    try:
-        await ensure_tables_exist()
-    except Exception as e:
-        logger.error(f"Error initializing database: {e}")
-        await update.message.reply_text("Error initializing database. Please try again later.")
-        return
-    
     # Update user activity in database
     try:
         await update_user_activity(user.id, user.first_name, user.last_name, user.username)
