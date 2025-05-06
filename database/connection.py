@@ -236,7 +236,10 @@ async def update_group_activity(group_id, title, username=None, member_count=Non
         await conn.commit()
 
 async def update_stats(user_id, game_type, result, move=None):
-    """Update user statistics after a game."""
+    """Update user challenge mode statistics after a game."""
+    if game_type != 'challenge':
+        return False, 1  # Only handle challenge mode stats here
+    
     async with get_db_connection() as conn:
         # Fetch current stats
         async with conn.execute('SELECT * FROM stats WHERE user_id = ?', (user_id,)) as cursor:
@@ -269,57 +272,41 @@ async def update_stats(user_id, game_type, result, move=None):
         
         # Update game stats
         total_games = stats['total_games'] + 1
+        challenge_games = stats['challenge_games'] + 1
         experience_points = stats['experience_points']
-        
-        if game_type == 'challenge':
-            challenge_games = stats['challenge_games'] + 1
-            await conn.execute('UPDATE stats SET challenge_games = ? WHERE user_id = ?', 
-                            (challenge_games, user_id))
         
         # Update result stats
         xp_gain = 0
         if result == 'win':
             total_wins = stats['total_wins'] + 1
-            xp_gain = 10  # Base XP for winning
-            
-            if game_type == 'challenge':
-                challenge_wins = stats['challenge_wins'] + 1
-                xp_gain += 5  # Additional XP for challenge win
-                await conn.execute('UPDATE stats SET challenge_wins = ? WHERE user_id = ?', 
-                                (challenge_wins, user_id))
-                
-            await conn.execute('UPDATE stats SET total_wins = ? WHERE user_id = ?', 
-                            (total_wins, user_id))
-                
+            challenge_wins = stats['challenge_wins'] + 1
+            xp_gain = 15  # 10 base + 5 for challenge win
+            await conn.execute('UPDATE stats SET total_wins = ?, challenge_wins = ? WHERE user_id = ?', 
+                            (total_wins, challenge_wins, user_id))
         elif result == 'loss':
             total_losses = stats['total_losses'] + 1
+            challenge_losses = stats['challenge_losses'] + 1
             xp_gain = 3  # Base XP for participating
-            
-            if game_type == 'challenge':
-                challenge_losses = stats['challenge_losses'] + 1
-                await conn.execute('UPDATE stats SET challenge_losses = ? WHERE user_id = ?', 
-                                (challenge_losses, user_id))
-                
-            await conn.execute('UPDATE stats SET total_losses = ? WHERE user_id = ?', 
-                            (total_losses, user_id))
-                
+            await conn.execute('UPDATE stats SET total_losses = ?, challenge_losses = ? WHERE user_id = ?', 
+                            (total_losses, challenge_losses, user_id))
         elif result == 'tie':
             total_ties = stats['total_ties'] + 1
             xp_gain = 5  # Base XP for tie
             await conn.execute('UPDATE stats SET total_ties = ? WHERE user_id = ?', 
                             (total_ties, user_id))
         
-        # Update total games and XP
+        # Update total games, challenge games, and XP
         experience_points += xp_gain
         level = calculate_level(experience_points)
         
         await conn.execute('''
             UPDATE stats SET 
                 total_games = ?,
+                challenge_games = ?,
                 experience_points = ?,
                 level = ?
             WHERE user_id = ?
-        ''', (total_games, experience_points, level, user_id))
+        ''', (total_games, challenge_games, experience_points, level, user_id))
         
         await conn.commit()
         
