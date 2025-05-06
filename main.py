@@ -24,6 +24,23 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN not found in environment variables.")
 
+async def shutdown(application):
+    """Gracefully shut down the application."""
+    logger.info("Shutting down bot...")
+    await application.stop()
+    await application.shutdown()
+    logger.info("Bot shutdown complete.")
+
+def handle_shutdown(loop, application):
+    """Handle SIGTERM/SIGINT for graceful shutdown."""
+    tasks = [task for task in asyncio.all_tasks(loop) if task is not asyncio.current_task()]
+    for task in tasks:
+        task.cancel()
+    loop.run_until_complete(shutdown(application))
+    loop.run_until_complete(loop.shutdown_asyncgens())
+    loop.close()
+    logger.info("Event loop closed.")
+
 # Error handler
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.error(f"Update {update} caused error: {context.error}")
@@ -55,8 +72,28 @@ async def main():
     app.add_handler(CallbackQueryHandler(manage_data_callback, pattern="^(confirm_wipe_all|cancel_wipe_all|confirm_delete_user|cancel_delete_user|confirm_delete_group|cancel_delete_group)_"))
     app.add_error_handler(error_handler)
 
+    # Set up signal handlers for graceful shutdown
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, handle_shutdown, loop, app)
+    
     logger.info("Starting bot polling...")
-    await app.run_polling()
+    try:
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+        # Keep the bot running until stopped
+        await asyncio.Event().wait()
+    except asyncio.CancelledError:
+        logger.info("Received shutdown signal, stopping bot...")
+    finally:
+        await shutdown(app)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Bot stopped by user")
+    except Exception as e:
+        logger.error(f"Fatal error: {e}")
+        raise
