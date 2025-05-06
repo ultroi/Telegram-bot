@@ -3,7 +3,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 from telegram.constants import ParseMode
 import random
 import logging
-from database.connection import update_user_activity, get_user_stats, get_leaderboard, get_user_achievements, update_stats, record_game, record_round, add_achievement
+from database.connection import ensure_tables_exist, update_user_activity, get_user_stats, get_leaderboard, get_user_achievements, update_stats, record_game, record_round, add_achievement
 
 #Set up logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -12,6 +12,14 @@ logger = logging.getLogger(__name__)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Interactive start command with UI for the Rock Paper Scissors bot."""
     user = update.message.from_user
+
+    # Ensure database tables exist
+    try:
+        await ensure_tables_exist()
+    except Exception as e:
+        logger.error(f"Error initializing database: {e}")
+        await update.message.reply_text("Error initializing database. Please try again later.")
+        return
     
     # Update user activity in database
     try:
