@@ -548,3 +548,42 @@ async def get_user_achievements(user_id):
         ''', (user_id,)) as cursor:
             achievements = await cursor.fetchall()
             return [dict(achievement) for achievement in achievements]
+
+
+async def migrate_stats():
+    async with get_db_connection() as conn:
+        # Move bot game stats from stats to bot_stats
+        await conn.execute('''
+            INSERT INTO bot_stats (user_id, total_games, total_wins, total_losses, total_ties,
+                                  rock_played, paper_played, scissor_played)
+            SELECT user_id, total_games, total_wins, total_losses, total_ties,
+                   rock_played, paper_played, scissor_played
+            FROM stats
+            WHERE user_id IN (
+                SELECT player1_id FROM game_history WHERE game_type = 'regular'
+            )
+        ''')
+        
+        # Reset stats table for users who only played bot games
+        await conn.execute('''
+            UPDATE stats
+            SET total_games = challenge_games,
+                total_wins = challenge_wins,
+                total_losses = challenge_losses,
+                total_ties = 0,
+                rock_played = 0,
+                paper_played = 0,
+                scissor_played = 0
+            WHERE user_id IN (
+                SELECT player1_id FROM game_history WHERE game_type = 'regular'
+            )
+        ''')
+        
+        # Update game_history to change 'regular' to 'bot'
+        await conn.execute('''
+            UPDATE game_history
+            SET game_type = 'bot'
+            WHERE game_type = 'regular'
+        ''')
+        
+        await conn.commit()
