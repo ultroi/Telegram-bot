@@ -610,3 +610,64 @@ async def migrate_stats():
         ''')
         
         await conn.commit()
+
+
+async def get_group_leaderboard(group_id: int, category: str, limit: int = 10) -> list:
+    """Get the leaderboard for users who played in a specific group."""
+    query_map = {
+        'wins': '''
+            SELECT u.user_id, u.first_name, u.last_name, s.total_wins, s.level, s.experience_points
+            FROM users u
+            JOIN stats s ON u.user_id = s.user_id
+            WHERE u.user_id IN (
+                SELECT DISTINCT player1_id FROM game_history WHERE group_id = ? AND game_type = 'challenge'
+                UNION
+                SELECT DISTINCT player2_id FROM game_history WHERE group_id = ? AND game_type = 'challenge' AND player2_id IS NOT NULL
+            )
+            ORDER BY s.total_wins DESC
+            LIMIT ?
+        ''',
+        'challenge_wins': '''
+            SELECT u.user_id, u.first_name, u.last_name, s.challenge_wins, s.level, s.experience_points
+            FROM users u
+            JOIN stats s ON u.user_id = s.user_id
+            WHERE u.user_id IN (
+                SELECT DISTINCT player1_id FROM game_history WHERE group_id = ? AND game_type = 'challenge'
+                UNION
+                SELECT DISTINCT player2_id FROM game_history WHERE group_id = ? AND game_type = 'challenge' AND player2_id IS NOT NULL
+            )
+            ORDER BY s.challenge_wins DESC
+            LIMIT ?
+        ''',
+        'level': '''
+            SELECT u.user_id, u.first_name, u.last_name, s.level, s.experience_points
+            FROM users u
+            JOIN stats s ON u.user_id = s.user_id
+            WHERE u.user_id IN (
+                SELECT DISTINCT player1_id FROM game_history WHERE group_id = ? AND game_type = 'challenge'
+                UNION
+                SELECT DISTINCT player2_id FROM game_history WHERE group_id = ? AND game_type = 'challenge' AND player2_id IS NOT NULL
+            )
+            ORDER BY s.level DESC, s.experience_points DESC
+            LIMIT ?
+        ''',
+        'games': '''
+            SELECT u.user_id, u.first_name, u.last_name, s.total_games, s.level
+            FROM users u
+            JOIN stats s ON u.user_id = s.user_id
+            WHERE u.user_id IN (
+                SELECT DISTINCT player1_id FROM game_history WHERE group_id = ? AND game_type = 'challenge'
+                UNION
+                SELECT DISTINCT player2_id FROM game_history WHERE group_id = ? AND game_type = 'challenge' AND player2_id IS NOT NULL
+            )
+            ORDER BY s.total_games DESC
+            LIMIT ?
+        '''
+    }
+    
+    query = query_map.get(category, query_map['wins'])
+    
+    async with get_db_connection() as conn:
+        async with conn.execute(query, (group_id, group_id, limit)) as cursor:
+            results = await cursor.fetchall()
+            return [dict(result) for result in results]
