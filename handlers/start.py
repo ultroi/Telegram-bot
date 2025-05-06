@@ -236,7 +236,7 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def start_bot_game(query, context):
     """Start a quick game against the bot."""
     user = query.from_user
-    bot_user = await query.bot.get_me()
+    bot_user = await context.bot.get_me()
     
     # Store game state
     context.user_data['bot_game'] = {
