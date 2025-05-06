@@ -623,6 +623,30 @@ async def get_user_achievements(user_id):
             achievements = await cursor.fetchall()
             return [dict(achievement) for achievement in achievements]
 
+
+async def update_game_winner(game_id, winner_id):
+    """Update the game record with the winner."""
+    async with get_db_connection() as conn:
+        await conn.execute('''
+            UPDATE game_history SET winner_id = ? WHERE game_id = ?
+        ''', (winner_id, game_id))
+        await conn.commit()
+
+async def get_last_moves(game_id):
+    """Retrieve the last moves for both players from round_details."""
+    async with get_db_connection() as conn:
+        async with conn.execute('''
+            SELECT player1_move, player2_move
+            FROM round_details
+            WHERE game_id = ?
+            ORDER BY round_number DESC
+            LIMIT 1
+        ''', (game_id,)) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return row['player1_move'], row['player2_move']
+            return None, None
+
 async def migrate_stats():
     """Migrate stats table to new schema and clean up game_history."""
     async with get_db_connection() as conn:
