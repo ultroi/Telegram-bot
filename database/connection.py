@@ -15,6 +15,11 @@ async def get_db_connection():
     finally:
         await conn.close()
 
+async def is_admin(user_id):
+    """Check if a user is an admin."""
+    # Replace with your admin IDs
+    return user_id in [123456789, 987654321]  # Update with actual admin IDs
+
 async def ensure_tables_exist():
     """Ensure all necessary tables and indexes exist in the database."""
     async with get_db_connection() as conn:
@@ -117,10 +122,21 @@ async def ensure_tables_exist():
                 user_id INTEGER NOT NULL,
                 achievement_type TEXT CHECK(achievement_type IN (
                     'first_win', 'first_bot_game', 'first_bot_win', 'perfect_victory',
-                    'veteran', 'comeback', 'lucky'
+                    'veteran', 'comeback', 'lucky', 'streak_winner', 'move_master'
                 )) NOT NULL,
                 achievement_date TEXT DEFAULT CURRENT_TIMESTAMP,
                 description TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(user_id)
+            )
+            ''')
+
+            # User progress table for achievement tracking
+            await conn.execute('''
+            CREATE TABLE IF NOT EXISTS user_progress (
+                user_id INTEGER PRIMARY KEY,
+                win_streak INTEGER DEFAULT 0,
+                last_move TEXT CHECK(last_move IN ('rock', 'paper', 'scissor', '')) DEFAULT '',
+                move_streak INTEGER DEFAULT 0,
                 FOREIGN KEY (user_id) REFERENCES users(user_id)
             )
             ''')
@@ -161,6 +177,13 @@ async def update_user_activity(user_id, first_name, last_name=None, username=Non
         # Initialize stats for bot games
         await conn.execute('''
             INSERT INTO bot_stats (user_id)
+            VALUES (?)
+            ON CONFLICT(user_id) DO NOTHING
+        ''', (user_id,))
+        
+        # Initialize user progress for achievements
+        await conn.execute('''
+            INSERT INTO user_progress (user_id)
             VALUES (?)
             ON CONFLICT(user_id) DO NOTHING
         ''', (user_id,))
@@ -317,6 +340,53 @@ async def update_bot_stats(user_id, result, move=None):
                          (total_games, user_id))
         
         await conn.commit()
+
+async def update_user_progress(user_id, result, move=None):
+    """Update user progress for achievement tracking."""
+    async with get_db_connection() as conn:
+        # Fetch current progress
+        async with conn.execute('SELECT * FROM user_progress WHERE user_id = ?', (user_id,)) as cursor:
+            progress = await cursor.fetchone()
+            
+            if not progress:
+                await conn.execute('''
+                    INSERT INTO user_progress (user_id) VALUES (?)
+                ''', (user_id,))
+                progress = {'win_streak': 0, 'last_move': '', 'move_streak': 0}
+        
+        # Update win streak
+        win_streak = progress['win_streak']
+        if result == 'win':
+            win_streak += 1
+        else:
+            win_streak = 0
+        
+        # Update move streak
+        last_move = progress['last_move']
+        move_streak = progress['move_streak']
+        
+        if move and move in ('rock', 'paper', 'scissor'):
+            if last_move == move:
+                move_streak += 1
+            else:
+                move_streak = 1
+            last_move = move
+        else:
+            move_streak = 0
+            last_move = ''
+        
+        # Update progress
+        await conn.execute('''
+            UPDATE user_progress SET
+                win_streak = ?,
+                last_move = ?,
+                move_streak = ?
+            WHERE user_id = ?
+        ''', (win_streak, last_move, move_streak, user_id))
+        
+        await conn.commit()
+        
+        return {'win_streak': win_streak, 'move_streak': move_streak}
 
 def calculate_level(xp):
     """Calculate user level based on experience points."""
@@ -557,7 +627,7 @@ async def get_system_stats():
             groups_count = (await cursor.fetchone())['count']
             
         async with conn.execute('SELECT COUNT(*) as count FROM game_history') as cursor:
-            games_count = (await cursor.fetchone())['count']
+            games_count = ( departe cursor.fetchone())['count']
             
         seven_days_ago = (datetime.now() - timedelta(days=7)).isoformat()
         async with conn.execute('SELECT COUNT(*) as count FROM users WHERE last_active > ?', 
@@ -623,7 +693,6 @@ async def get_user_achievements(user_id):
             achievements = await cursor.fetchall()
             return [dict(achievement) for achievement in achievements]
 
-
 async def update_game_winner(game_id, winner_id):
     """Update the game record with the winner."""
     async with get_db_connection() as conn:
@@ -647,15 +716,74 @@ async def get_last_moves(game_id):
                 return row['player1_move'], row['player2_move']
             return None, None
 
+async def list_users(raw=False):
+    """List all users in the database."""
+    async with get_db_connection() as conn:
+        async with conn.execute('SELECT user_id, first_name, last_name, username FROM users') as cursor:
+            users = await cursor.fetchall()
+            if raw:
+                return [dict(user) for user in users]
+            return "\n".join([f"ID: {u['user_id']}, Name: {u['first_name']} {u['last_name'] or ''}" for u in users]) or "No users found."
+
+async def list_groups(raw=False):
+    """List all groups in the database."""
+    async with get_db_connection() as conn:
+        async with conn.execute('SELECT group_id, title, username FROM groups') as cursor:
+            groups = await cursor.fetchall()
+            if raw:
+                return [dict(group) for group in groups]
+            return "\n".join([f"ID: {g['group_id']}, Title: {g['title']}" for g in groups]) or "No groups found."
+
+async def delete_user_data(user_id):
+    """Delete all data for a specific user."""
+    async with get_db_connection() as conn:
+        await conn.execute('DELETE FROM users WHERE user_id = ?', (user_id,))
+        await conn.execute('DELETE FROM stats WHERE user_id = ?', (user_id,))
+        await conn.execute('DELETE FROM bot_stats WHERE user_id = ?', (user_id,))
+        await conn.execute('DELETE FROM achievements WHERE user_id = ?', (user_id,))
+        await conn.execute('DELETE FROM user_progress WHERE user_id = ?', (user_id,))
+        await conn.execute('DELETE FROM game_history WHERE player1_id = ? OR player2_id = ?', (user_id, user_id))
+        await conn.commit()
+    return f"✅ User ID {user_id} deleted successfully."
+
+async def delete_group_data(group_id):
+    """Delete all data for a specific group."""
+    async with get_db_connection() as conn:
+        await conn.execute('DELETE FROM groups WHERE group_id = ?', (group_id,))
+        await conn.execute('DELETE FROM game_history WHERE group_id = ?', (group_id,))
+        await conn.commit()
+    return f"✅ Group ID {group_id} deleted successfully."
+
+async def migrate_schema():
+    """Wipe and recreate all database tables."""
+    async with get_db_connection() as conn:
+        try:
+            # Drop all tables
+            await conn.execute('DROP TABLE IF EXISTS users')
+            await conn.execute('DROP TABLE IF EXISTS groups')
+            await conn.execute('DROP TABLE IF EXISTS stats')
+            await conn.execute('DROP TABLE IF EXISTS bot_stats')
+            await conn.execute('DROP TABLE IF EXISTS game_history')
+            await conn.execute('DROP TABLE IF EXISTS round_details')
+            await conn.execute('DROP TABLE IF EXISTS achievements')
+            await conn.execute('DROP TABLE IF EXISTS user_progress')
+            await conn.commit()
+            
+            # Recreate tables
+            await ensure_tables_exist()
+            print("Database schema migrated successfully!")
+        except sqlite3.Error as e:
+            print(f"Error during schema migration: {e}")
+            raise
+
 async def migrate_stats():
-    """Migrate stats table to new schema and clean up game_history."""
+    """Migrate stats table to new schema and initialize new tables."""
     async with get_db_connection() as conn:
         try:
             # Check if total_ties column exists
             async with conn.execute("PRAGMA table_info(stats)") as cursor:
                 columns = [row['name'] for row in await cursor.fetchall()]
                 if 'total_ties' in columns:
-                    # Rename total_ties to challenge_ties
                     await conn.execute('ALTER TABLE stats RENAME COLUMN total_ties TO challenge_ties')
                     print("Renamed stats.total_ties to stats.challenge_ties")
             
@@ -691,6 +819,12 @@ async def migrate_stats():
                 UPDATE game_history
                 SET game_type = 'bot'
                 WHERE game_type = 'regular'
+            ''')
+            
+            # Initialize user_progress for existing users
+            await conn.execute('''
+                INSERT OR IGNORE INTO user_progress (user_id)
+                SELECT user_id FROM users
             ''')
             
             await conn.commit()
