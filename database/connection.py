@@ -754,11 +754,18 @@ async def delete_group_data(group_id):
         await conn.commit()
     return f"✅ Group ID {group_id} deleted successfully."
 
+async def backup_database():
+    """Backup the database before migration."""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_file = f"trihand_backup_{timestamp}.db"
+    shutil.copy('trihand.db', backup_file)
+    print(f"Database backed up to {backup_file}")
+
 async def migrate_schema():
-    """Wipe and recreate all database tables."""
+    """Wipe and recreate all database tables with backup."""
+    await backup_database()
     async with get_db_connection() as conn:
         try:
-            # Drop all tables
             await conn.execute('DROP TABLE IF EXISTS users')
             await conn.execute('DROP TABLE IF EXISTS groups')
             await conn.execute('DROP TABLE IF EXISTS stats')
@@ -769,7 +776,6 @@ async def migrate_schema():
             await conn.execute('DROP TABLE IF EXISTS user_progress')
             await conn.commit()
             
-            # Recreate tables
             await ensure_tables_exist()
             print("Database schema migrated successfully!")
         except sqlite3.Error as e:
