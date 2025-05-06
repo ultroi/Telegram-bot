@@ -44,7 +44,7 @@ app.add_handler(CallbackQueryHandler(handle_bot_move, pattern="^bot_move_"))
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.error(f"Update {update} caused error: {context.error}")
 
-application.add_error_handler(error_handler)
+app.add_error_handler(error_handler)
 
 # Run the bot
 if __name__ == "__main__":
