@@ -36,15 +36,11 @@ async def clear_ongoing_challenges():
     return old_count
 
 async def clear_challenges_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Command to clear all ongoing challenges."""
-    # Restrict this command to admins
-    admin_ids = [5956598856]  # Add admin IDs here
-    if update.message.from_user.id not in admin_ids:
-        await update.message.reply_text("⛔ You are not authorized to use this command.")
-        return
+    user_id = update.message.from_user.id
+    chat_id = update.message.chat_id
 
-    count = await clear_ongoing_challenges()
-    await update.message.reply_text(f"🧹 Cleared {count} ongoing challenges.")
+    count = await clear_user_challenges_in_group(user_id=user_id, chat_id=chat_id)
+    await update.message.reply_text(f"🧹 Cleared {count} of your ongoing challenges in this group.")
 
 async def challenge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Challenge another user to a game of Rock Paper Scissors."""
