@@ -1,6 +1,7 @@
 import os
 import logging
 import asyncio
+import signal
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from handlers.start import start, start_callback, handle_bot_move
