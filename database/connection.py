@@ -337,17 +337,15 @@ def calculate_level(xp):
     else:
         return 5 + (xp - 1000) // 500  # Higher levels require 500 XP each
 
-async def record_game(player1_id, player2_id, winner_id, game_type, rounds, group_id=None):
-    """Record a completed game in the history."""
+async def record_round(game_id, round_number, player1_move, player2_move, winner_id=None):
+    """Record details of an individual round."""
     async with get_db_connection() as conn:
-        cursor = await conn.execute('''
-            INSERT INTO game_history 
-            (player1_id, player2_id, winner_id, game_type, rounds, group_id) 
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (player1_id, player2_id, winner_id, game_type, rounds, group_id))
-        game_id = cursor.lastrowid
+        await conn.execute('''
+            INSERT INTO round_details 
+            (game_id, round_number, player1_move, player2_move, winner_id) 
+            VALUES (?, ?, ?, ?, ?)
+        ''', (game_id, round_number, player1_move, player2_move, winner_id))
         await conn.commit()
-        return game_id
 
 async def record_game(player1_id, player2_id, winner_id, game_type, rounds, group_id=None):
     """Record a completed game in the history."""
