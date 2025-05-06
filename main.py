@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from handlers.start import start, start_callback, handle_bot_move
@@ -22,34 +23,39 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN not found in environment variables.")
 
-# Build the application
-app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-# Register command handlers
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("stats", stats))
-app.add_handler(CommandHandler("gstats", admin_stats))
-app.add_handler(CommandHandler("leaderboard", leaderboard))
-app.add_handler(CommandHandler("clearchallenges", clear_challenges_command))
-app.add_handler(CommandHandler("challenge", challenge))
-app.add_handler(CallbackQueryHandler(challenge_callback, pattern=r"^(accept|decline)_"))
-app.add_handler(CallbackQueryHandler(move_callback, pattern=r"^move_(rock|paper|scissor)_"))
-app.add_handler(CallbackQueryHandler(achievements_callback, pattern=r"^achievements_\d+$"))
-app.add_handler(CallbackQueryHandler(back_to_stats_callback, pattern=r"^back_to_stats_\d+$"))
-app.add_handler(CallbackQueryHandler(leaderboard_callback, pattern=r"^leaderboard_.*$"))
-app.add_handler(CallbackQueryHandler(start_callback, pattern="^(help|stats|quick_game|leaderboard|achievements|back_to_start)$"))
-app.add_handler(CallbackQueryHandler(handle_bot_move, pattern="^bot_move_"))
-app.add_handler(CallbackQueryHandler(handle_rematch, pattern="^rematch_"))
-app.add_handler(CommandHandler("mdata", manage_data_command))
-app.add_handler(CallbackQueryHandler(manage_data_callback, pattern="^(confirm_wipe_all|cancel_wipe_all|confirm_delete_user|cancel_delete_user|confirm_delete_group|cancel_delete_group)_"))
-
 # Error handler
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.error(f"Update {update} caused error: {context.error}")
 
-app.add_error_handler(error_handler)
+async def main():
+    """Main function to run the bot."""
+    logger.info("Initializing bot...")
+    await ensure_tables_exist()
+    await migrate_stats()
+    
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-# Run the bot
+    # Register command handlers
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("stats", stats))
+    app.add_handler(CommandHandler("gstats", admin_stats))
+    app.add_handler(CommandHandler("leaderboard", leaderboard))
+    app.add_handler(CommandHandler("clearchallenges", clear_challenges_command))
+    app.add_handler(CommandHandler("challenge", challenge))
+    app.add_handler(CallbackQueryHandler(challenge_callback, pattern=r"^(accept|decline)_"))
+    app.add_handler(CallbackQueryHandler(move_callback, pattern=r"^move_(rock|paper|scissor)_"))
+    app.add_handler(CallbackQueryHandler(achievements_callback, pattern=r"^achievements_\d+$"))
+    app.add_handler(CallbackQueryHandler(back_to_stats_callback, pattern=r"^back_to_stats_\d+$"))
+    app.add_handler(CallbackQueryHandler(leaderboard_callback, pattern=r"^leaderboard_.*$"))
+    app.add_handler(CallbackQueryHandler(start_callback, pattern="^(help|stats|quick_game|leaderboard|achievements|back_to_start)$"))
+    app.add_handler(CallbackQueryHandler(handle_bot_move, pattern="^bot_move_"))
+    app.add_handler(CallbackQueryHandler(handle_rematch, pattern="^rematch_"))
+    app.add_handler(CommandHandler("mdata", manage_data_command))
+    app.add_handler(CallbackQueryHandler(manage_data_callback, pattern="^(confirm_wipe_all|cancel_wipe_all|confirm_delete_user|cancel_delete_user|confirm_delete_group|cancel_delete_group)_"))
+    app.add_error_handler(error_handler)
+
+    logger.info("Starting bot polling...")
+    await app.run_polling()
+
 if __name__ == "__main__":
-    logger.info("Starting bot...")
-    app.run_polling()
+    asyncio.run(main())
