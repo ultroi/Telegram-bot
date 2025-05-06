@@ -777,17 +777,81 @@ async def migrate_schema():
             raise
 
 async def migrate_stats():
-    """Migrate stats table to new schema and initialize new tables."""
+    """Migrate stats table to new schema without data loss."""
     async with get_db_connection() as conn:
         try:
-            # Check if total_ties column exists
+            await backup_database()
+            
+            # Check if achievements table needs schema update
+            async with conn.execute("PRAGMA table_info(achievements)") as cursor:
+                columns = [row['name'] for row in await cursor.fetchall()]
+                if 'achievement_type' in columns:
+                    async with conn.execute("SELECT achievement_type FROM achievements LIMIT 1") as cursor:
+                        row = await cursor.fetchone()
+                        if row and 'streak_winner' not in row['achievement_type']:
+                            # Create new achievements table
+                            await conn.execute('''
+                                CREATE TABLE achievements_new (
+                                    achievement_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                    user_id INTEGER NOT NULL,
+                                    achievement_type TEXT CHECK(achievement_type IN (
+                                        'first_win', 'first_bot_game', 'first_bot_win', 'perfect_victory',
+                                        'veteran', 'comeback', 'lucky', 'streak_winner', 'move_master'
+                                    )) NOT NULL,
+                                    achievement_date TEXT DEFAULT CURRENT_TIMESTAMP,
+                                    description TEXT NOT NULL,
+                                    FOREIGN KEY (user_id) REFERENCES users(user_id)
+                                )
+                            ''')
+                            await conn.execute('''
+                                INSERT INTO achievements_new (achievement_id, user_id, achievement_type, achievement_date, description)
+                                SELECT achievement_id, user_id, achievement_type, achievement_date, description
+                                FROM achievements
+                            ''')
+                            await conn.execute('DROP TABLE achievements')
+                            await conn.execute('ALTER TABLE achievements_new RENAME TO achievements')
+                            print("Updated achievements table schema")
+            
+            # Create user_progress if not exists
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS user_progress (
+                    user_id INTEGER PRIMARY KEY,
+                    win_streak INTEGER DEFAULT 0,
+                    last_move TEXT CHECK(last_move IN ('rock', 'paper', 'scissor', '')) DEFAULT '',
+                    move_streak INTEGER DEFAULT 0,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id)
+                )
+            ''')
+            
+            # Initialize user_progress for existing users
+            await conn.execute('''
+                INSERT OR IGNORE INTO user_progress (user_id)
+                SELECT user_id FROM users
+            ''')
+            
+            # Check if stats table needs total_ties migration
             async with conn.execute("PRAGMA table_info(stats)") as cursor:
                 columns = [row['name'] for row in await cursor.fetchall()]
                 if 'total_ties' in columns:
                     await conn.execute('ALTER TABLE stats RENAME COLUMN total_ties TO challenge_ties')
                     print("Renamed stats.total_ties to stats.challenge_ties")
             
-            # Move bot game stats from stats to bot_stats (if not already done)
+            # Ensure bot_stats table exists
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS bot_stats (
+                    user_id INTEGER PRIMARY KEY,
+                    total_games INTEGER DEFAULT 0,
+                    total_wins INTEGER DEFAULT 0,
+                    total_losses INTEGER DEFAULT 0,
+                    total_ties INTEGER DEFAULT 0,
+                    rock_played INTEGER DEFAULT 0,
+                    paper_played INTEGER DEFAULT 0,
+                    scissor_played INTEGER DEFAULT 0,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id)
+                )
+            ''')
+            
+            # Migrate bot game stats if needed
             await conn.execute('''
                 INSERT OR IGNORE INTO bot_stats (user_id, total_games, total_wins, total_losses, total_ties,
                                               rock_played, paper_played, scissor_played)
@@ -799,35 +863,11 @@ async def migrate_stats():
                 )
             ''')
             
-            # Reset stats table for users who only played bot games
-            await conn.execute('''
-                UPDATE stats
-                SET total_games = challenge_games,
-                    total_wins = challenge_wins,
-                    total_losses = challenge_losses,
-                    challenge_ties = 0,
-                    rock_played = 0,
-                    paper_played = 0,
-                    scissor_played = 0
-                WHERE user_id IN (
-                    SELECT player1_id FROM game_history WHERE game_type = 'regular'
-                )
-            ''')
-            
-            # Update game_history to change 'regular' to 'bot'
-            await conn.execute('''
-                UPDATE game_history
-                SET game_type = 'bot'
-                WHERE game_type = 'regular'
-            ''')
-            
-            # Initialize user_progress for existing users
-            await conn.execute('''
-                INSERT OR IGNORE INTO user_progress (user_id)
-                SELECT user_id FROM users
-            ''')
+            # Update game_history
+            await conn.execute('UPDATE game_history SET game_type = "bot" WHERE game_type = "regular"')
             
             await conn.commit()
             print("Stats migration completed successfully!")
         except sqlite3.Error as e:
             print(f"Error during stats migration: {e}")
+            raise
