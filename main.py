@@ -5,6 +5,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Cal
 from handlers.start import start, start_callback, handle_bot_move
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler
 from handlers.mod import stats, leaderboard, achievements_callback, back_to_stats_callback, leaderboard_callback
+from handlers.challenge import challenge, challenge_callback, move_callback, clearchallenges
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
