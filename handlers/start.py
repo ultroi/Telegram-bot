@@ -129,7 +129,7 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 overall_games = stats['total_games'] + stats['bot_games']
                 overall_wins = stats['total_wins'] + stats['bot_wins']
                 overall_losses = stats['total_losses'] + stats['bot_losses']
-                overall_ties = stats['total_ties'] + stats['bot_ties']
+                overall_ties = stats['challenge_ties'] + stats['bot_ties']
                 overall_win_rate = round((overall_wins / overall_games) * 100, 1) if overall_games > 0 else 0
                 
                 # Calculate challenge-specific win rate
@@ -164,7 +164,7 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"Games: {challenge_games}\n"
                     f"Wins: {stats['challenge_wins']} ({challenge_win_rate}%)\n"
                     f"Losses: {stats['challenge_losses']}\n"
-                    f"Ties: {stats['total_ties']}\n\n"
+                    f"Ties: {stats['challenge_ties']}\n\n"
                     
                     f"🤖 <b>Bot Game Stats:</b>\n"
                     f"Games: {bot_games}\n"
