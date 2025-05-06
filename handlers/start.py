@@ -90,8 +90,9 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     user = query.from_user
+    chat = query.message.chat
     action = query.data
-    logger.info(f"Callback received: {action} from user {user.id}")
+    logger.info(f"Callback received: {action} from user {user.id} in chat {chat.id}")
     
     if action == "help":
         help_text = (
@@ -108,7 +109,8 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "   - Rock crushes Scissors\n"
             "   - Scissors cut Paper\n"
             "   - Paper covers Rock\n\n"
-            "🏆 <b>Stats & Achievements</b> are tracked for all players!"
+            "🏆 <b>Stats & Achievements</b> are tracked globally for all players!\n"
+            "📊 Use /stats to see your stats or /leaderboard to view rankings."
         )
         
         await query.edit_message_caption(
@@ -123,31 +125,79 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not stats:
                 stats_text = "No stats available yet! Play some games to start tracking your progress!"
             else:
+                # Calculate overall stats
+                overall_games = stats['total_games'] + stats['bot_games']
+                overall_wins = stats['total_wins'] + stats['bot_wins']
+                overall_losses = stats['total_losses'] + stats['bot_losses']
+                overall_ties = stats['total_ties'] + stats['bot_ties']
+                overall_win_rate = round((overall_wins / overall_games) * 100, 1) if overall_games > 0 else 0
+                
+                # Calculate challenge-specific win rate
+                challenge_games = stats['challenge_games']
+                challenge_win_rate = round((stats['challenge_wins'] / challenge_games) * 100, 1) if challenge_games > 0 else 0
+                
+                # Calculate bot-specific win rate
+                bot_games = stats['bot_games']
+                bot_win_rate = round((stats['bot_wins'] / bot_games) * 100, 1) if bot_games > 0 else 0
+                
+                # Calculate total move preferences
+                total_rock = stats['rock_played'] + stats['bot_rock_played']
+                total_paper = stats['paper_played'] + stats['bot_paper_played']
+                total_scissor = stats['scissor_played'] + stats['bot_scissor_played']
+                
+                # Determine overall favorite move
+                moves = {'rock': total_rock, 'paper': total_paper, 'scissor': total_scissor}
+                favorite_move = max(moves, key=moves.get) if sum(moves.values()) > 0 else None
+                
                 stats_text = (
-                    f"📊 <b>{user.first_name}'s Game Stats</b> 📊\n\n"
-                    f"🏆 <b>Wins:</b> {stats['total_wins']}\n"
-                    f"😞 <b>Losses:</b> {stats['total_losses']}\n"
-                    f"🤝 <b>Ties:</b> {stats['total_ties']}\n"
-                    f"📈 <b>Win Rate:</b> {stats['win_rate']}%\n\n"
-                    f"🎚️ <b>Level:</b> {stats['level']}\n"
-                    f"✨ <b>XP:</b> {stats['experience_points']}\n\n"
-                    f"🌟 <b>Favorite Move:</b> {stats['favorite_move'] or 'None'}\n"
-                    f"🏅 <b>Leaderboard Rank:</b> #{stats['leaderboard_rank']}"
+                    f"📊 <b>Stats for {user.first_name}</b> 📊\n\n"
+                    f"<b>Level:</b> {stats['level']} ({stats['experience_points']} XP)\n"
+                    f"<b>Rank:</b> #{stats['leaderboard_rank']} on the global leaderboard\n\n"
+                    
+                    f"🎮 <b>Overall Stats:</b>\n"
+                    f"Games Played: {overall_games}\n"
+                    f"Wins: {overall_wins} ({overall_win_rate}%)\n"
+                    f"Losses: {overall_losses}\n"
+                    f"Ties: {overall_ties}\n\n"
+                    
+                    f"🏆 <b>Challenge Mode Stats:</b>\n"
+                    f"Games: {challenge_games}\n"
+                    f"Wins: {stats['challenge_wins']} ({challenge_win_rate}%)\n"
+                    f"Losses: {stats['challenge_losses']}\n"
+                    f"Ties: {stats['total_ties']}\n\n"
+                    
+                    f"🤖 <b>Bot Game Stats:</b>\n"
+                    f"Games: {bot_games}\n"
+                    f"Wins: {stats['bot_wins']} ({bot_win_rate}%)\n"
+                    f"Losses: {stats['bot_losses']}\n"
+                    f"Ties: {stats['bot_ties']}\n\n"
+                    
+                    f"🎲 <b>Move Preferences:</b>\n"
+                    f"🪨 Rock: {total_rock} times\n"
+                    f"📄 Paper: {total_paper} times\n"
+                    f"✂️ Scissor: {total_scissor} times\n"
                 )
+                
+                if favorite_move:
+                    favorite_move_emoji = {"rock": "🪨", "paper": "📄", "scissor": "✂️"}[favorite_move]
+                    stats_text += f"Favorite Move: {favorite_move_emoji} {favorite_move.capitalize()}\n"
+            
+            keyboard = [
+                [InlineKeyboardButton("🏅 View Achievements", callback_data=f"achievements_{user.id}")],
+                [InlineKeyboardButton("🔙 Back", callback_data="back_to_start")]
+            ]
             
             await query.edit_message_caption(
                 caption=stats_text,
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔙 Back", callback_data="back_to_start")],
-                    [InlineKeyboardButton("🏆 Leaderboard", callback_data="leaderboard")]
-                ]),
+                reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode=ParseMode.HTML
             )
         except Exception as e:
             logger.error(f"Error fetching stats for user {user.id}: {e}")
             await query.edit_message_caption(
-                caption="Error fetching stats. Please try again later.",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back_to_start")]])
+                caption="⚠️ Error fetching stats. Please try again later.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back_to_start")]]),
+                parse_mode=ParseMode.HTML
             )
     
     elif action == "quick_game":
@@ -156,47 +206,59 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"Error starting bot game for user {user.id}: {e}")
             await query.edit_message_caption(
-                caption="Error starting quick game. Please try again later.",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back_to_start")]])
+                caption="⚠️ Error starting quick game. Please try again later.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back_to_start")]]),
+                parse_mode=ParseMode.HTML
             )
     
     elif action == "leaderboard":
         try:
-            leaderboard = await get_leaderboard(category='wins', limit=10)
-            leaderboard_text = "🏆 <b>Top Players</b> 🏆\n\n"
-            
-            if not leaderboard:
-                leaderboard_text += "No players on the leaderboard yet!"
+            category = "wins"
+            if chat.type == "private":
+                # Show global leaderboard in PM
+                leaders = await get_leaderboard(category, 10)
+                message, keyboard = await format_leaderboard(leaders, category)
             else:
-                for i, player in enumerate(leaderboard, 1):
-                    name = f"{player['first_name']} {player['last_name'] or ''}".strip()
-                    leaderboard_text += f"{i}. {name} - {player['total_wins']} wins (Lvl {player['level']})\n"
-            
-            leaderboard_text += "\n<i>Play more to climb the ranks!</i>"
+                # Show group leaderboard in group chat
+                group_id = chat.id
+                leaders = await get_group_leaderboard(group_id, category, 10)
+                message, keyboard = await format_leaderboard(leaders, category, is_group=True, group_id=group_id)
             
             await query.edit_message_caption(
-                caption=leaderboard_text,
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back_to_start")]]),
+                caption=message,
+                reply_markup=keyboard,
                 parse_mode=ParseMode.HTML
             )
         except Exception as e:
-            logger.error(f"Error fetching leaderboard: {e}")
+            logger.error(f"Error fetching leaderboard for user {user.id} in chat {chat.id}: {e}")
             await query.edit_message_caption(
-                caption="Error fetching leaderboard. Please try again later.",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back_to_start")]])
+                caption="⚠️ Error fetching leaderboard. Please try again later.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back_to_start")]]),
+                parse_mode=ParseMode.HTML
             )
     
     elif action == "achievements":
         try:
             achievements = await get_user_achievements(user.id)
-            achievements_text = f"🌟 <b>{user.first_name}'s Achievements</b> 🌟\n\n"
+            achievements_text = f"🏅 <b>{user.first_name}'s Achievements</b> 🏅\n\n"
             
             if not achievements:
-                achievements_text += "No achievements yet! Keep playing to earn some!"
+                achievements_text += "No achievements unlocked yet! Keep playing challenge or bot games to earn achievements!"
             else:
                 for ach in achievements:
-                    achievements_text += f"✅ <b>{ach['achievement_type']}</b>\n<i>{ach['description']}</i>\n"
-                    achievements_text += f"<i>Earned: {ach['achievement_date']}</i>\n\n"
+                    achievement_icon = {
+                        "perfect_victory": "🌟",
+                        "first_win": "🎉",
+                        "first_bot_game": "🤖",
+                        "first_bot_win": "🎮",
+                        "veteran": "🏆",
+                        "comeback": "💪",
+                        "lucky": "🍀"
+                    }.get(ach['achievement_type'], "🎖️")
+                    
+                    achievements_text += f"{achievement_icon} <b>{ach['achievement_type'].replace('_', ' ').title()}</b>\n"
+                    achievements_text += f"<i>{ach['description']}</i>\n"
+                    achievements_text += f"Earned on: {ach['achievement_date'].split('T')[0]}\n\n"
             
             await query.edit_message_caption(
                 caption=achievements_text,
@@ -206,8 +268,9 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"Error fetching achievements for user {user.id}: {e}")
             await query.edit_message_caption(
-                caption="Error fetching achievements. Please try again later.",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back_to_start")]])
+                caption="⚠️ Error fetching achievements. Please try again later.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back_to_start")]]),
+                parse_mode=ParseMode.HTML
             )
     
     elif action == "back_to_start":
@@ -220,10 +283,11 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "3. Make your move when it's your turn\n"
             "4. Best of 1-10 rounds wins!\n\n"
             "🏆 <b>Features:</b>\n"
-            "- Track your win/loss stats\n"
+            "- Track your global win/loss stats\n"
             "- Earn achievements\n"
             "- Level up as you play\n"
-            "- Rematch option after games"
+            "- Compete on global or group leaderboards\n"
+            "- Play quick games against the bot"
         )
         
         keyboard = [
@@ -250,8 +314,9 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"Error returning to start menu for user {user.id}: {e}")
             await query.edit_message_caption(
-                caption="Error returning to main menu. Please try again.",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back_to_start")]])
+                caption="⚠️ Error returning to main menu. Please try again.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back_to_start")]]),
+                parse_mode=ParseMode.HTML
             )
 
 async def start_bot_game(query, context):
@@ -285,8 +350,9 @@ async def start_bot_game(query, context):
     except Exception as e:
         logger.error(f"Error starting bot game UI for user {user.id}: {e}")
         await query.edit_message_caption(
-            caption="Error starting game. Please try again.",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back_to_start")]])
+            caption="⚠️ Error starting game. Please try again.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back_to_start")]]),
+            parse_mode=ParseMode.HTML
         )
 
 async def handle_bot_move(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -330,7 +396,7 @@ async def handle_bot_move(update: Update, context: ContextTypes.DEFAULT_TYPE):
             player1_id=user.id,
             player2_id=context.bot.id,
             winner_id=winner_id,
-            game_type='bot',  # Use 'bot' game type
+            game_type='bot',
             rounds=1
         )
         
@@ -347,11 +413,11 @@ async def handle_bot_move(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update_bot_stats(user.id, result, player_move)
         
         # Check for achievements
-        stats = await get_user_bot_stats(user.id)  # New function to get bot stats
+        stats = await get_user_bot_stats(user.id)
         if stats['total_games'] == 1:
-            await add_achievement(user.id, "First Bot Game", "Played your first game against the bot!")
+            await add_achievement(user.id, "first_bot_game", "Played your first game against the bot!")
         if result == 'win' and stats['total_wins'] == 1:
-            await add_achievement(user.id, "First Bot Win", "Won your first game against the bot!")
+            await add_achievement(user.id, "first_bot_win", "Won your first game against the bot!")
     
     except Exception as e:
         logger.error(f"Error processing bot game for user {user.id}: {e}")
@@ -371,6 +437,7 @@ async def handle_bot_move(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error updating bot game result for user {user.id}: {e}")
         await query.edit_message_caption(
-            caption="Error displaying game result. Please try again.",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back_to_start")]])
+            caption="⚠️ Error displaying game result. Please try again.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back_to_start")]]),
+            parse_mode=ParseMode.HTML
         )
