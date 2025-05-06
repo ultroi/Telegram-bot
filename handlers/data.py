@@ -120,6 +120,7 @@ async def delete_group_data(group_id: int) -> str:
             return f"⚠️ Error deleting group ID {group_id}: {e}"
 
 async def manage_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle the /manage_data command for database management."""
     user = update.effective_user
     if not await is_admin(user.id):
         await update.message.reply_text("🚫 You are not authorized to use this command.")
@@ -130,20 +131,19 @@ async def manage_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(
             "📊 <b>Data Management Command</b>\n\n"
             "Usage:\n"
-            "/mdata wipe_all - Wipe all database data\n"
-            "/mdata list_users - List all users\n"
-            "/mdata list_groups - List all groups\n"
-            "/mdata delete_user <user_id> - Delete specific user data\n"
-            "/mdata delete_group <group_id> - Delete specific group data\n\n"
+            "<code>/manage_data wipe_all</code> - Wipe all database data\n"
+            "<code>/manage_data list_users</code> - List all users\n"
+            "<code>/manage_data list_groups</code> - List all groups\n"
+            "<code>/manage_data delete_user USER_ID</code> - Delete specific user data\n"
+            "<code>/manage_data delete_group GROUP_ID</code> - Delete specific group data\n\n"
             "Please provide a valid action.",
-            parse_mode="HTML"
+            parse_mode=ParseMode.HTML
         )
         return
 
     action = args[0].lower()
-    
+
     if action == "wipe_all":
-        # Create confirmation prompt
         keyboard = [
             [
                 InlineKeyboardButton("✅ Confirm Wipe", callback_data=f"confirm_wipe_all_{user.id}"),
@@ -151,20 +151,20 @@ async def manage_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             ]
         ]
         await update.message.reply_text(
-            "⚠️ <b>WARNING</b>: This will delete ALL data in the database!\n"
+            "⚠️ <b>WARNING</b>: This will delete <b>ALL</b> data in the database!\n"
             "Are you sure you want to proceed?",
             reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="HTML"
+            parse_mode=ParseMode.HTML
         )
-    
+
     elif action == "list_users":
         result = await list_users()
-        await update.message.reply_text(result, parse_mode="HTML")
-    
+        await update.message.reply_text(result, parse_mode=ParseMode.HTML)
+
     elif action == "list_groups":
         result = await list_groups()
-        await update.message.reply_text(result, parse_mode="HTML")
-    
+        await update.message.reply_text(result, parse_mode=ParseMode.HTML)
+
     elif action == "delete_user":
         if len(args) < 2:
             await update.message.reply_text("⚠️ Please provide a user ID.\nExample: /manage_data delete_user 123456789")
@@ -178,21 +178,20 @@ async def manage_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE
                 ]
             ]
             await update.message.reply_text(
-                f"⚠️ <b>WARNING</b>: This will delete all data for user ID {user_id}!\n"
+                f"⚠️ <b>WARNING</b>: This will delete all data for user ID <code>{user_id}</code>!\n"
                 "Are you sure you want to proceed?",
                 reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="HTML"
+                parse_mode=ParseMode.HTML
             )
         except ValueError:
             await update.message.reply_text("⚠️ Invalid user ID. Please provide a numeric ID.")
-    
+
     elif action == "delete_group":
         if len(args) < 2:
             await update.message.reply_text("⚠️ Please provide a group ID.\nExample: /manage_data delete_group -123456789")
             return
         try:
             group_id = int(args[1])
-            # Create confirmation prompt
             keyboard = [
                 [
                     InlineKeyboardButton("✅ Confirm Delete", callback_data=f"confirm_delete_group_{group_id}_{user.id}"),
@@ -200,14 +199,14 @@ async def manage_data_command(update: Update, context: ContextTypes.DEFAULT_TYPE
                 ]
             ]
             await update.message.reply_text(
-                f"⚠️ <b>WARNING</b>: This will delete all data for group ID {group_id}!\n"
+                f"⚠️ <b>WARNING</b>: This will delete all data for group ID <code>{group_id}</code>!\n"
                 "Are you sure you want to proceed?",
                 reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="HTML"
+                parse_mode=ParseMode.HTML
             )
         except ValueError:
             await update.message.reply_text("⚠️ Invalid group ID. Please provide a numeric ID.")
-    
+
     else:
         await update.message.reply_text("⚠️ Invalid action. Use: wipe_all, list_users, list_groups, delete_user, delete_group")
 
