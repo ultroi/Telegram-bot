@@ -4,7 +4,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from handlers.start import start, start_callback, handle_bot_move
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler
-from handlers.mod import stats, leaderboard, achievements_callback, back_to_stats_callback, leaderboard_callback
+from handlers.mod import stats, leaderboard, achievements_callback, back_to_stats_callback, leaderboard_callback, admin_stats
 from handlers.challenge import challenge, challenge_callback, move_callback, clear_challenges_command
 from dotenv import load_dotenv
 
@@ -28,6 +28,7 @@ app = ApplicationBuilder().token(BOT_TOKEN).build()
 # Register command handlers
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("stats", stats))
+app.add_handler(CommandHandler("gstats", admin_stats))
 app.add_handler(CommandHandler("leaderboard", leaderboard))
 app.add_handler(CommandHandler("clearchallenges", clear_challenges_command))
 app.add_handler(CommandHandler("challenge", challenge))
