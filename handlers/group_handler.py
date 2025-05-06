@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ChatMemberHandler, ContextTypes
 import logging
-from database.connecton import update_group_activity, remove_group
+from database.connection import update_group_activity, remove_group
 
 logger = logging.getLogger(__name__)
 
