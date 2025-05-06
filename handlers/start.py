@@ -62,7 +62,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Send the message with photo and buttons
     try:
         await update.message.reply_photo(
-            photo="https://i.imgur.com/JK7Iu5R.png",
+            photo="https://files.catbox.moe/qrswmu.jpg",
             caption=welcome_text,
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode=ParseMode.HTML
