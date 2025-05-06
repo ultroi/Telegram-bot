@@ -196,7 +196,7 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 for ach in achievements:
                     achievements_text += f"✅ <b>{ach['achievement_type']}</b>\n<i>{ach['description']}</i>\n"
-                    achievements_text += f"<small>Earned: {ach['achievement_date']}</small>\n\n"
+                    achievements_text += f"<i>Earned: {ach['achievement_date']}</i>\n\n"
             
             await query.edit_message_caption(
                 caption=achievements_text,
