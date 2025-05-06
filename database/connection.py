@@ -1,7 +1,7 @@
 import sqlite3
 from contextlib import asynccontextmanager
 import aiosqlite
-from datetime import datetime
+from datetime import datetime, timedelta
 
 @asynccontextmanager
 async def get_db_connection():
