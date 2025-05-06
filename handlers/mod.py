@@ -8,14 +8,15 @@ from database.connection import (
     get_leaderboard,
     get_system_stats,
     get_broadcast_users,
-    get_user_achievements
+    get_user_achievements,
+    get_group_leaderboard
 )
 from datetime import datetime, timedelta
 import asyncio
 
 # Stats command
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show user's game statistics."""
+    """Show user's overall game statistics, including challenge and bot games."""
     user = update.message.from_user
     
     # Update user activity
@@ -53,53 +54,85 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Format the stats message
     display_name = target_user.first_name if target_user else stats['first_name']
     
-    # Calculate win rate percentages
-    total_games = stats['total_games']
-    win_rate = stats['win_rate']
+    # Calculate overall stats
+    overall_games = stats['total_games'] + stats['bot_games']
+    overall_wins = stats['total_wins'] + stats['bot_wins']
+    overall_losses = stats['total_losses'] + stats['bot_losses']
+    overall_ties = stats['total_ties'] + stats['bot_ties']
+    overall_win_rate = round((overall_wins / overall_games) * 100, 1) if overall_games > 0 else 0
+    
+    # Calculate challenge-specific win rate
     challenge_games = stats['challenge_games']
     challenge_win_rate = round((stats['challenge_wins'] / challenge_games) * 100, 1) if challenge_games > 0 else 0
     
-    # Format the stats message with emojis and good formatting
+    # Calculate bot-specific win rate
+    bot_games = stats['bot_games']
+    bot_win_rate = round((stats['bot_wins'] / bot_games) * 100, 1) if bot_games > 0 else 0
+    
+    # Calculate total move preferences
+    total_rock = stats['rock_played'] + stats['bot_rock_played']
+    total_paper = stats['paper_played'] + stats['bot_paper_played']
+    total_scissor = stats['scissor_played'] + stats['bot_scissor_played']
+    
+    # Determine overall favorite move
+    moves = {
+        'rock': total_rock,
+        'paper': total_paper,
+        'scissor': total_scissor
+    }
+    favorite_move = max(moves, key=moves.get) if sum(moves.values()) > 0 else None
+    
+    # Format the stats message with emojis and clear sections
     stats_message = (
         f"📊 <b>Stats for {display_name}</b> 📊\n\n"
         f"<b>Level:</b> {stats['level']} ({stats['experience_points']} XP)\n"
         f"<b>Rank:</b> #{stats['leaderboard_rank']} on the leaderboard\n\n"
         
         f"🎮 <b>Overall Stats:</b>\n"
-        f"Games Played: {total_games}\n"
-        f"Wins: {stats['total_wins']} ({win_rate}%)\n"
-        f"Losses: {stats['total_losses']}\n"
+        f"Games Played: {overall_games}\n"
+        f"Wins: {overall_wins} ({overall_win_rate}%)\n"
+        f"Losses: {overall_losses}\n"
+        f"Ties: {overall_ties}\n\n"
+        
+        f"🏆 <b>Challenge Mode Stats:</b>\n"
+        f"Games: {challenge_games}\n"
+        f"Wins: {stats['challenge_wins']} ({challenge_win_rate}%)\n"
+        f"Losses: {stats['challenge_losses']}\n"
         f"Ties: {stats['total_ties']}\n\n"
         
-        f"🏆 <b>Challenge Games:</b>\n"
-        f"Challenges: {challenge_games}\n"
-        f"Wins: {stats['challenge_wins']} ({challenge_win_rate}%)\n"
-        f"Losses: {stats['challenge_losses']}\n\n"
+        f"🤖 <b>Bot Game Stats:</b>\n"
+        f"Games: {bot_games}\n"
+        f"Wins: {stats['bot_wins']} ({bot_win_rate}%)\n"
+        f"Losses: {stats['bot_losses']}\n"
+        f"Ties: {stats['bot_ties']}\n\n"
         
         f"🎲 <b>Move Preferences:</b>\n"
-        f"🪨 Rock: {stats['rock_played']} times\n"
-        f"📄 Paper: {stats['paper_played']} times\n"
-        f"✂️ Scissor: {stats['scissor_played']} times\n"
+        f"🪨 Rock: {total_rock} times\n"
+        f"📄 Paper: {total_paper} times\n"
+        f"✂️ Scissor: {total_scissor} times\n"
     )
     
-    if stats['favorite_move']:
-        favorite_move_emoji = {"rock": "🪨", "paper": "📄", "scissor": "✂️"}[stats['favorite_move']]
-        stats_message += f"Favorite Move: {favorite_move_emoji} {stats['favorite_move'].capitalize()}\n\n"
+    if favorite_move:
+        favorite_move_emoji = {"rock": "🪨", "paper": "📄", "scissor": "✂️"}[favorite_move]
+        stats_message += f"Favorite Move: {favorite_move_emoji} {favorite_move.capitalize()}\n\n"
     
     # Add achievements button
     keyboard = [
-        [InlineKeyboardButton("🏅 View Achievements", callback_data=f"achievements_{user.id}")]
+        [InlineKeyboardButton("🏅 View Achievements", callback_data=f"achievements_{stats['user_id'] if target_user else user.id}")]
     ]
     
-    await update.message.reply_text(
-        stats_message,
-        parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    try:
+        await update.message.reply_text(
+            stats_message,
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    except Exception as e:
+        logger.error(f"Error displaying stats for user {user.id}: {e}")
+        await update.message.reply_text("⚠️ Error displaying stats. Please try again.")
 
-# Achievements callback
 async def achievements_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show user achievements."""
+    """Show user achievements for both challenge and bot games."""
     query = update.callback_query
     await query.answer()
     
@@ -111,7 +144,7 @@ async def achievements_callback(update: Update, context: ContextTypes.DEFAULT_TY
     
     if not achievements:
         await query.edit_message_text(
-            "🏅 No achievements unlocked yet!\n\nKeep playing to earn achievements!",
+            "🏅 No achievements unlocked yet!\n\nKeep playing challenge or bot games to earn achievements!",
             parse_mode=ParseMode.HTML
         )
         return
@@ -123,6 +156,8 @@ async def achievements_callback(update: Update, context: ContextTypes.DEFAULT_TY
         achievement_icon = {
             "perfect_victory": "🌟",
             "first_win": "🎉",
+            "first_bot_game": "🤖",
+            "first_bot_win": "🎮",
             "veteran": "🏆",
             "comeback": "💪",
             "lucky": "🍀"
@@ -137,74 +172,119 @@ async def achievements_callback(update: Update, context: ContextTypes.DEFAULT_TY
         [InlineKeyboardButton("◀️ Back to Stats", callback_data=f"back_to_stats_{user_id}")]
     ]
     
-    await query.edit_message_text(
-        achievements_message,
-        parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    try:
+        await query.edit_message_text(
+            achievements_message,
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    except Exception as e:
+        logger.error(f"Error displaying achievements for user {user_id}: {e}")
+        await query.edit_message_text(
+            "⚠️ Error displaying achievements. Please try again.",
+            parse_mode=ParseMode.HTML
+        )
 
-# Back to stats callback
 async def back_to_stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Return to stats view from achievements."""
+    """Handle the back to stats button."""
     query = update.callback_query
     await query.answer()
     
-    _, _, user_id = query.data.split("_")
+    _, user_id = query.data.split("_")
     user_id = int(user_id)
     
-    # Get user stats again
+    # Get user stats
     stats = await get_user_stats(user_id)
     
     if not stats:
         await query.edit_message_text("No statistics found. Play some games first!")
         return
     
-    # Re-create the stats message (simplified version)
+    # Calculate overall stats
+    overall_games = stats['total_games'] + stats['bot_games']
+    overall_wins = stats['total_wins'] + stats['bot_wins']
+    overall_losses = stats['total_losses'] + stats['bot_losses']
+    overall_ties = stats['total_ties'] + stats['bot_ties']
+    overall_win_rate = round((overall_wins / overall_games) * 100, 1) if overall_games > 0 else 0
+    
+    # Calculate challenge-specific win rate
+    challenge_games = stats['challenge_games']
+    challenge_win_rate = round((stats['challenge_wins'] / challenge_games) * 100, 1) if challenge_games > 0 else 0
+    
+    # Calculate bot-specific win rate
+    bot_games = stats['bot_games']
+    bot_win_rate = round((stats['bot_wins'] / bot_games) * 100, 1) if bot_games > 0 else 0
+    
+    # Calculate total move preferences
+    total_rock = stats['rock_played'] + stats['bot_rock_played']
+    total_paper = stats['paper_played'] + stats['bot_paper_played']
+    total_scissor = stats['scissor_played'] + stats['bot_scissor_played']
+    
+    # Determine overall favorite move
+    moves = {
+        'rock': total_rock,
+        'paper': total_paper,
+        'scissor': total_scissor
+    }
+    favorite_move = max(moves, key=moves.get) if sum(moves.values()) > 0 else None
+    
+    # Format the stats message
     stats_message = (
         f"📊 <b>Stats for {stats['first_name']}</b> 📊\n\n"
         f"<b>Level:</b> {stats['level']} ({stats['experience_points']} XP)\n"
-        f"<b>Rank:</b> #{stats['leaderboard_rank']}\n\n"
-        f"Games: {stats['total_games']} | Wins: {stats['total_wins']} ({stats['win_rate']}%)\n"
-        f"Challenges: {stats['challenge_games']} | Wins: {stats['challenge_wins']}\n"
+        f"<b>Rank:</b> #{stats['leaderboard_rank']} on the leaderboard\n\n"
+        
+        f"🎮 <b>Overall Stats:</b>\n"
+        f"Games Played: {overall_games}\n"
+        f"Wins: {overall_wins} ({overall_win_rate}%)\n"
+        f"Losses: {overall_losses}\n"
+        f"Ties: {overall_ties}\n\n"
+        
+        f"🏆 <b>Challenge Mode Stats:</b>\n"
+        f"Games: {challenge_games}\n"
+        f"Wins: {stats['challenge_wins']} ({challenge_win_rate}%)\n"
+        f"Losses: {stats['challenge_losses']}\n"
+        f"Ties: {stats['total_ties']}\n\n"
+        
+        f"🤖 <b>Bot Game Stats:</b>\n"
+        f"Games: {bot_games}\n"
+        f"Wins: {stats['bot_wins']} ({bot_win_rate}%)\n"
+        f"Losses: {stats['bot_losses']}\n"
+        f"Ties: {stats['bot_ties']}\n\n"
+        
+        f"🎲 <b>Move Preferences:</b>\n"
+        f"🪨 Rock: {total_rock} times\n"
+        f"📄 Paper: {total_paper} times\n"
+        f"✂️ Scissor: {total_scissor} times\n"
     )
     
-    # Add achievements button again
+    if favorite_move:
+        favorite_move_emoji = {"rock": "🪨", "paper": "📄", "scissor": "✂️"}[favorite_move]
+        stats_message += f"Favorite Move: {favorite_move_emoji} {favorite_move.capitalize()}\n\n"
+    
+    # Add achievements button
     keyboard = [
         [InlineKeyboardButton("🏅 View Achievements", callback_data=f"achievements_{user_id}")]
     ]
     
-    await query.edit_message_text(
-        stats_message,
-        parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    try:
+        await query.edit_message_text(
+            stats_message,
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    except Exception as e:
+        logger.error(f"Error displaying stats for user {user_id}: {e}")
+        await query.edit_message_text(
+            "⚠️ Error displaying stats. Please try again.",
+            parse_mode=ParseMode.HTML
+        )
 
-# Leaderboard command
-async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show the game leaderboard."""
-    user = update.message.from_user
-    
-    # Update user activity
-    await update_user_activity(user.id, user.first_name, user.last_name, user.username)
-    
-    # Determine which leaderboard to show
-    category = "wins"  # Default category
-    if context.args:
-        arg = context.args[0].lower()
-        if arg in ["wins", "challenge", "level", "games"]:
-            if arg == "challenge":
-                category = "challenge_wins"
-            else:
-                category = arg
-    
-    # Get leaderboard data
-    leaders = await get_leaderboard(category, 10)
-    
+async def format_leaderboard(leaders: list, category: str, is_group: bool = False, group_id: int = None) -> tuple[str, InlineKeyboardMarkup]:
+    """Format the leaderboard message and buttons."""
     if not leaders:
-        await update.message.reply_text("No players found on the leaderboard yet!")
-        return
+        return ("No players found on the leaderboard yet!", InlineKeyboardMarkup([]))
     
-    # Create leaderboard message with formatting and emojis
     category_titles = {
         "wins": "🏆 Most Wins",
         "challenge_wins": "🎯 Challenge Champions",
@@ -212,9 +292,9 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "games": "🎮 Most Active Players"
     }
     
-    leaderboard_message = f"📊 <b>{category_titles[category]} Leaderboard</b> 📊\n\n"
+    title = f"📊 <b>{category_titles[category]} {'Group' if is_group else 'Global'} Leaderboard</b> 📊\n\n"
+    leaderboard_message = title
     
-    # Medals for top 3
     medals = ["🥇", "🥈", "🥉"]
     
     for i, leader in enumerate(leaders):
@@ -230,23 +310,128 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif category == "games":
             leaderboard_message += f"{rank_display} <b>{name}</b> - {leader['total_games']} games played (Level {leader['level']})\n"
     
-    # Add buttons to switch between leaderboard categories
+    # Create buttons
     keyboard = [
         [
-            InlineKeyboardButton("🏆 Wins", callback_data="leaderboard_wins"),
-            InlineKeyboardButton("🎯 Challenges", callback_data="leaderboard_challenge_wins")
+            InlineKeyboardButton("🏆 Wins", callback_data=f"leaderboard_{'group_' if is_group else ''}{category}_wins_{group_id or 0}"),
+            InlineKeyboardButton("🎯 Challenges", callback_data=f"leaderboard_{'group_' if is_group else ''}{category}_challenge_wins_{group_id or 0}")
         ],
         [
-            InlineKeyboardButton("⭐ Levels", callback_data="leaderboard_level"),
-            InlineKeyboardButton("🎮 Most Active", callback_data="leaderboard_games")
+            InlineKeyboardButton("⭐ Levels", callback_data=f"leaderboard_{'group_' if is_group else ''}{category}_level_{group_id or 0}"),
+            InlineKeyboardButton("🎮 Most Active", callback_data=f"leaderboard_{'group_' if is_group else ''}{category}_games_{group_id or 0}")
         ]
     ]
     
-    await update.message.reply_text(
-        leaderboard_message,
-        parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    # Add toggle button
+    if is_group:
+        keyboard.append([InlineKeyboardButton("🌍 View Global Leaderboard", callback_data=f"leaderboard_switch_to_global_{category}_{group_id}")])
+    elif group_id:
+        keyboard.append([InlineKeyboardButton("🏠 Back to Group Leaderboard", callback_data=f"leaderboard_switch_to_group_{category}_{group_id}")])
+    
+    return leaderboard_message, InlineKeyboardMarkup(keyboard)
+
+async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show the game leaderboard (global in PM, group-specific in GC)."""
+    user = update.message.from_user
+    chat = update.effective_chat
+    
+    # Update user activity
+    await update_user_activity(user.id, user.first_name, user.last_name, user.username)
+    
+    # Determine category
+    category = "wins"
+    if context.args:
+        arg = context.args[0].lower()
+        if arg in ["wins", "challenge", "level", "games"]:
+            category = "challenge_wins" if arg == "challenge" else arg
+    
+    try:
+        if chat.type == "private":
+            # Show global leaderboard in PM
+            leaders = await get_leaderboard(category, 10)
+            message, keyboard = await format_leaderboard(leaders, category)
+        else:
+            # Show group leaderboard in group chat
+            group_id = chat.id
+            leaders = await get_group_leaderboard(group_id, category, 10)
+            message, keyboard = await format_leaderboard(leaders, category, is_group=True, group_id=group_id)
+        
+        await update.message.reply_text(
+            message,
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard
+        )
+    except Exception as e:
+        logger.error(f"Error displaying leaderboard for user {user.id} in chat {chat.id}: {e}")
+        await update.message.reply_text("⚠️ Error displaying leaderboard. Please try again.")
+
+async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle leaderboard category switches and global/group toggling."""
+    query = update.callback_query
+    await query.answer()
+    
+    data = query.data.split("_")
+    action = data[0]
+    
+    if action == "leaderboard":
+        # Category switch within the same leaderboard type
+        is_group = data[1] == "group"
+        current_category = data[2]
+        new_category = data[3]
+        group_id = int(data[4]) if data[4] != "0" else None
+        
+        try:
+            if is_group:
+                leaders = await get_group_leaderboard(group_id, new_category, 10)
+                message, keyboard = await format_leaderboard(leaders, new_category, is_group=True, group_id=group_id)
+            else:
+                leaders = await get_leaderboard(new_category, 10)
+                message, keyboard = await format_leaderboard(leaders, new_category, group_id=group_id)
+            
+            await query.edit_message_text(
+                message,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard
+            )
+        except Exception as e:
+            logger.error(f"Error switching leaderboard category for user {query.from_user.id}: {e}")
+            await query.edit_message_text("⚠️ Error switching leaderboard category. Please try again.")
+    
+    elif action == "leaderboard_switch_to_global":
+        # Switch from group to global leaderboard
+        category = data[1]
+        group_id = int(data[2])
+        
+        try:
+            leaders = await get_leaderboard(category, 10)
+            message, keyboard = await format_leaderboard(leaders, category, group_id=group_id)
+            
+            await query.edit_message_text(
+                message,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard
+            )
+        except Exception as e:
+            logger.error(f"Error switching to global leaderboard for user {query.from_user.id}: {e}")
+            await query.edit_message_text("⚠️ Error switching to global leaderboard. Please try again.")
+    
+    elif action == "leaderboard_switch_to_group":
+        # Switch from global to group leaderboard
+        category = data[1]
+        group_id = int(data[2])
+        
+        try:
+            leaders = await get_group_leaderboard(group_id, category, 10)
+            message, keyboard = await format_leaderboard(leaders, category, is_group=True, group_id=group_id)
+            
+            await query.edit_message_text(
+                message,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard
+            )
+        except Exception as e:
+            logger.error(f"Error switching to group leaderboard for user {query.from_user.id}: {e}")
+            await query.edit_message_text("⚠️ Error switching to group leaderboard. Please try again.")
 
 # Leaderboard callback for switching categories
 async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
