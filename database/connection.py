@@ -518,6 +518,31 @@ async def get_system_stats():
             'total_games': games_count,
             'active_users': active_users
         }
+
+
+async def get_user_bot_stats(user_id):
+    """Get bot game statistics for a user."""
+    async with get_db_connection() as conn:
+        async with conn.execute('''
+            SELECT total_games, total_wins, total_losses, total_ties,
+                   rock_played, paper_played, scissor_played
+            FROM bot_stats
+            WHERE user_id = ?
+        ''', (user_id,)) as cursor:
+            bot_stats = await cursor.fetchone()
+            
+            if not bot_stats:
+                return {
+                    'total_games': 0,
+                    'total_wins': 0,
+                    'total_losses': 0,
+                    'total_ties': 0,
+                    'rock_played': 0,
+                    'paper_played': 0,
+                    'scissor_played': 0
+                }
+            
+            return dict(bot_stats)
         
 async def get_broadcast_users():
     """Get list of all user IDs for broadcasting."""
