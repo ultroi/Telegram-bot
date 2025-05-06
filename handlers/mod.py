@@ -310,26 +310,33 @@ async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin command to view system statistics."""
     # Check if user is admin
-    admin_ids = [5956598856]  # Add admin IDs here
+    admin_ids = [5956598856]
     if update.message.from_user.id not in admin_ids:
         await update.message.reply_text("⛔ You are not authorized to use this command.")
         return
-    
+
     # Get system stats
     stats = await get_system_stats()
-    
+
+    # Handle None response
+    if stats is None:
+        await update.message.reply_text("⚠️ Failed to fetch system stats.")
+        return
+
+    # Build and send stats message
     stats_message = (
         f"🤖 <b>System Statistics</b> 🤖\n\n"
-        f"👥 <b>Users:</b> {stats['total_users']}\n"
-        f"👥 <b>Active Users (7d):</b> {stats['active_users']}\n"
-        f"👥 <b>Groups:</b> {stats['total_groups']}\n"
-        f"🎮 <b>Total Games:</b> {stats['total_games']}\n"
+        f"👥 <b>Users:</b> {stats.get('total_users', 'N/A')}\n"
+        f"👥 <b>Active Users (7d):</b> {stats.get('active_users', 'N/A')}\n"
+        f"👥 <b>Groups:</b> {stats.get('total_groups', 'N/A')}\n"
+        f"🎮 <b>Total Games:</b> {stats.get('total_games', 'N/A')}\n"
     )
-    
+
     await update.message.reply_text(
         stats_message,
         parse_mode=ParseMode.HTML
     )
+
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin command to broadcast a message to all users."""
