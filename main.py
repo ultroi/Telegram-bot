@@ -4,8 +4,8 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from database.connection import ensure_tables_exist
 from handlers.start import start
-from handlers.play import play, button_callback
-from handlers.challenge import challenge, challenge_callback, move_callback, clear_challenges_command
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler
+from handlers.stats import stats, leaderboard, achievements_callback, back_to_stats_callback, leaderboard_callback
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -23,16 +23,19 @@ if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN not found in environment variables.")
 
 # Build the application
-application = ApplicationBuilder().token(BOT_TOKEN).build()
+app = ApplicationBuilder().token(BOT_TOKEN).build()
 
 # Register command handlers
-application.add_handler(CommandHandler("start", start))
-application.add_handler(CommandHandler("play", play))
-application.add_handler(CallbackQueryHandler(button_callback))
-application.add_handler(CommandHandler("challenge", challenge))
-application.add_handler(CallbackQueryHandler(challenge_callback, pattern="^(accept|decline)_"))
-application.add_handler(CommandHandler("clearchallenges", clear_challenges_command))
-application.add_handler(CallbackQueryHandler(move_callback, pattern="^(🪨 Rock|📄 Paper|✂️ Scissor)"))
+app.add_handler(CommandHandler("start", start))
+# Command handlers
+app.add_handler(CommandHandler("stats", stats))
+app.add_handler(CommandHandler("leaderboard", leaderboard))
+
+# CallbackQuery handlers
+app.add_handler(CallbackQueryHandler(achievements_callback, pattern=r"^achievements_\d+$"))
+app.add_handler(CallbackQueryHandler(back_to_stats_callback, pattern=r"^back_to_stats_\d+$"))
+app.add_handler(CallbackQueryHandler(leaderboard_callback, pattern=r"^leaderboard_.*$"))
+
 
 # Error handler
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
