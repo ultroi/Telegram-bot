@@ -8,7 +8,9 @@ from database.connection import (
     update_stats, 
     record_game, 
     record_round,
-    add_achievement
+    add_achievement,
+    update_game_winner,
+    get_last_moves
 )
 from datetime import datetime, timedelta
 import random
@@ -43,8 +45,6 @@ async def clear_challenges_command(update: Update, context: ContextTypes.DEFAULT
     await update.message.reply_text(f"🧹 Cleared {count} of your ongoing challenges in this group.")
 
 async def challenge(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Challenge another user to a game of Rock Paper Scissors."""
-    # Update user and group activity
     user = update.message.from_user
     await update_user_activity(user.id, user.first_name, user.last_name, user.username)
     
@@ -427,6 +427,7 @@ async def end_game(context, challenge_data):
     challenged = challenge_data["challenged"]
     challenger_score = challenge_data["challenger_score"]
     challenged_score = challenge_data["challenged_score"]
+    game_id = challenge_data["game_id"]
     
     # Determine the overall winner
     if challenger_score > challenged_score:
@@ -435,85 +436,276 @@ async def end_game(context, challenge_data):
         winner_score = challenger_score
         loser_score = challenged_score
         winner_id = challenger.id
+        winner_result = "win"
+        loser_result = "loss"
     elif challenged_score > challenger_score:
         winner = challenged
         loser = challenger
         winner_score = challenged_score
         loser_score = challenger_score
         winner_id = challenged.id
+        winner_result = "win"
+        loser_result = "loss"
     else:
         winner = None
         loser = None
         winner_id = None
+        winner_result = "tie"
+        loser_result = "tie"
     
     # Update game record with the winner
-    game_id = challenge_data["game_id"]
-    await update_game_winner(game_id, winner_id)
+    try:
+        await update_game_winner(game_id, winner_id)
+    except Exception as e:
+        logger.error(f"Error updating game winner for game {game_id}: {e}")
+    
+    # Get last moves for move streak tracking
+    try:
+        challenger_move, challenged_move = await get_last_moves(game_id)
+    except Exception as e:
+        logger.error(f"Error fetching last moves for game {game_id}: {e}")
+        challenger_move = None
+        challenged_move = None
     
     # Create final result message
+    result_text = (
+        f"🎮 <b>Game Over!</b> 🎮\n\n"
+        f"<b>Final Score:</b>\n"
+        f"{challenger.first_name}: {challenger_score}\n"
+        f"{challenged.first_name}: {challenged_score}\n\n"
+    )
+    
+    achievement_notifications = []
+    
     if winner:
-        result_text = (
-            f"🎮 <b>Game Over!</b> 🎮\n\n"
-            f"<b>Final Score:</b>\n"
-            f"{challenger.first_name}: {challenger_score}\n"
-            f"{challenged.first_name}: {challenged_score}\n\n"
+        result_text += (
             f"🏆 <b>{winner.first_name} WINS!</b> 🏆\n"
             f"<i>With a score of {winner_score}-{loser_score}</i>"
         )
         
-        # Update stats for both players (only for challenge mode)
-        level_up, new_level = await update_stats(winner.id, "challenge", "win")
-        await update_stats(loser.id, "challenge", "loss")
+        # Update stats for both players
+        try:
+            level_up, new_level = await update_stats(winner.id, "challenge", winner_result, challenger_move if winner.id == challenger.id else challenged_move)
+            await update_stats(loser.id, "challenge", loser_result, challenged_move if loser.id == challenged.id else challenger_move)
+        except Exception as e:
+            logger.error(f"Error updating stats for game {game_id}: {e}")
         
-        # Check for achievements
-        if challenge_data["rounds"] >= 3 and winner_score == challenge_data["rounds"]:
-            # Perfect victory achievement
-            await add_achievement(
-                winner.id, 
-                "perfect_victory", 
-                f"Won all {challenge_data['rounds']} rounds against {loser.first_name}"
-            )
-            result_text += f"\n\n🌟 <b>Achievement Unlocked:</b> Perfect Victory! 🌟"
+        # Update user progress
+        try:
+            winner_progress = await update_user_progress(winner.id, winner_result, challenger_move if winner.id == challenger.id else challenged_move)
+            loser_progress = await update_user_progress(loser.id, loser_result, challenged_move if loser.id == challenged.id else challenger_move)
+        except Exception as e:
+            logger.error(f"Error updating user progress for game {game_id}: {e}")
+            winner_progress = {'win_streak': 0, 'move_streak': 0}
+            loser_progress = {'win_streak': 0, 'move_streak': 0}
         
-        # Add level up notification if applicable
+        # Check achievements for winner
+        try:
+            existing_achievements = await get_user_achievements(winner.id)
+            existing_types = {ach['achievement_type'] for ach in existing_achievements}
+            
+            # First win
+            winner_stats = await get_user_stats(winner.id)
+            if winner_stats['total_wins'] == 1 and 'first_win' not in existing_types:
+                await add_achievement(winner.id, "first_win", "Won your first challenge game!")
+                achievement_notifications.append(f"🎉 <b>Achievement Unlocked for {winner.first_name}:</b> First Win!")
+            
+            # Perfect victory
+            if challenge_data["rounds"] >= 3 and winner_score == challenge_data["rounds"] and 'perfect_victory' not in existing_types:
+                await add_achievement(
+                    winner.id, 
+                    "perfect_victory", 
+                    f"Won all {challenge_data['rounds']} rounds against {loser.first_name}"
+                )
+                achievement_notifications.append(f"🌟 <b>Achievement Unlocked for {winner.first_name}:</b> Perfect Victory!")
+            
+            # Streak winner
+            if winner_progress['win_streak'] >= 3 and 'streak_winner' not in existing_types:
+                await add_achievement(winner.id, "streak_winner", "Won 3 games in a row! You're on fire!")
+                achievement_notifications.append(f"🔥 <b>Achievement Unlocked for {winner.first_name}:</b> Streak Winner!")
+            
+            # Move master
+            if winner_progress['move_streak'] >= 10 and 'move_master' not in existing_types:
+                await add_achievement(winner.id, "move_master", "Mastered a move by playing it 10 times in a row!")
+                achievement_notifications.append(f"🎯 <b>Achievement Unlocked for {winner.first_name}:</b> Move Master!")
+        except Exception as e:
+            logger.error(f"Error checking achievements for winner {winner.id}: {e}")
+        
+        # Check achievements for loser (only move_master)
+        try:
+            existing_achievements = await get_user_achievements(loser.id)
+            existing_types = {ach['achievement_type'] for ach in existing_achievements}
+            
+            if loser_progress['move_streak'] >= 10 and 'move_master' not in existing_types:
+                await add_achievement(loser.id, "move_master", "Mastered a move by playing it 10 times in a row!")
+                achievement_notifications.append(f"🎯 <b>Achievement Unlocked for {loser.first_name}:</b> Move Master!")
+        except Exception as e:
+            logger.error(f"Error checking achievements for loser {loser.id}: {e}")
+        
+        # Add level up notification
         if level_up:
-            result_text += f"\n\n⬆️ <b>{winner.first_name} leveled up to {new_level}!</b> ⬆️"
+            achievement_notifications.append(f"⬆️ <b>{winner.first_name} leveled up to {new_level}!</b> ⬆️")
             
     else:
-        result_text = (
-            f"🎮 <b>Game Over!</b> 🎮\n\n"
-            f"<b>Final Score:</b>\n"
-            f"{challenger.first_name}: {challenger_score}\n"
-            f"{challenged.first_name}: {challenged_score}\n\n"
-            f"🤝 <b>It's a TIE!</b> 🤝"
-        )
+        result_text += f"🤝 <b>It's a TIE!</b> 🤝"
         
-        # Update stats for both players (only for challenge mode)
-        await update_stats(challenger.id, "challenge", "tie")
-        await update_stats(challenged.id, "challenge", "tie")
+        # Update stats for both players
+        try:
+            await update_stats(challenger.id, "challenge", "tie", challenger_move)
+            await update_stats(challenged.id, "challenge", "tie", challenged_move)
+        except Exception as e:
+            logger.error(f"Error updating stats for tie game {game_id}: {e}")
+        
+        # Update user progress
+        try:
+            challenger_progress = await update_user_progress(challenger.id, "tie", challenger_move)
+            challenged_progress = await update_user_progress(challenged.id, "tie", challenged_move)
+        except Exception as e:
+            logger.error(f"Error updating user progress for tie game {game_id}: {e}")
+            challenger_progress = {'win_streak': 0, 'move_streak': 0}
+            challenged_progress = {'win_streak': 0, 'move_streak': 0}
+        
+        # Check achievements for both players (only move_master)
+        for player, move, progress in [
+            (challenger, challenger_move, challenger_progress),
+            (challenged, challenged_move, challenged_progress)
+        ]:
+            try:
+                existing_achievements = await get_user_achievements(player.id)
+                existing_types = {ach['achievement_type'] for ach in existing_achievements}
+                
+                if progress['move_streak'] >= 10 and 'move_master' not in existing_types:
+                    await add_achievement(player.id, "move_master", "Mastered a move by playing it 10 times in a row!")
+                    achievement_notifications.append(f"🎯 <b>Achievement Unlocked for {player.first_name}:</b> Move Master!")
+            except Exception as e:
+                logger.error(f"Error checking achievements for player {player.id}: {e}")
+    
+    # Append achievement notifications
+    if achievement_notifications:
+        result_text += "\n\n" + "\n".join(achievement_notifications)
     
     # Send final result message
-    await context.bot.edit_message_text(
-        chat_id=challenge_data["chat_id"],
-        message_id=challenge_data["message_id"],
-        text=result_text,
-        parse_mode=ParseMode.HTML
-    )
+    try:
+        await context.bot.edit_message_text(
+            chat_id=challenge_data["chat_id"],
+            message_id=challenge_data["message_id"],
+            text=result_text,
+            parse_mode=ParseMode.HTML
+        )
+    except Exception as e:
+        logger.error(f"Error sending result message for game {game_id}: {e}")
     
     # Add rematch button
     keyboard = [
         [InlineKeyboardButton("🔄 Rematch", callback_data=f"rematch_{challenger.id}_{challenged.id}")]
     ]
-    await context.bot.send_message(
-        chat_id=challenge_data["chat_id"],
-        text="Want to play again?",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    try:
+        await context.bot.send_message(
+            chat_id=challenge_data["chat_id"],
+            text="Want to play again?",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    except Exception as e:
+        logger.error(f"Error sending rematch button for game {game_id}: {e}")
     
     # Remove challenge from ongoing list
     challenge_id = f"{challenger.id}_{challenged.id}"
     if challenge_id in ongoing_challenges:
         del ongoing_challenges[challenge_id]
+
+async def handle_rematch(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle rematch callback query."""
+    query = update.callback_query
+    await query.answer()
+    
+    chat_id = query.message.chat_id
+    user = query.from_user
+    data = query.data.split('_')
+    
+    if len(data) != 3 or data[0] != "rematch":
+        logger.error(f"Invalid rematch callback data: {query.data}")
+        await query.message.reply_text("⚠️ Invalid rematch request.")
+        return
+    
+    try:
+        challenger_id = int(data[1])
+        challenged_id = int(data[2])
+    except ValueError:
+        logger.error(f"Invalid user IDs in rematch callback: {query.data}")
+        await query.message.reply_text("⚠️ Invalid rematch request.")
+        return
+    
+    # Verify users
+    if user.id not in (challenger_id, challenged_id):
+        await query.message.reply_text("⚠️ You are not part of this game!")
+        return
+    
+    # Check for ongoing challenges
+    challenge_id = f"{challenger_id}_{challenged_id}"
+    reverse_challenge_id = f"{challenged_id}_{challenger_id}"
+    if challenge_id in ongoing_challenges or reverse_challenge_id in ongoing_challenges:
+        await query.message.reply_text("⚠️ A challenge is already ongoing between these players!")
+        return
+    
+    # Determine new challenger and challenged
+    if user.id == challenger_id:
+        new_challenger_id = challenger_id
+        new_challenged_id = challenged_id
+    else:
+        new_challenger_id = challenged_id
+        new_challenged_id = challenger_id
+    
+    # Start new challenge (reuse existing challenge logic)
+    try:
+        # Assume start_challenge is a function that initiates a challenge
+        # Replace with your actual challenge initiation logic
+        challenge_data = {
+            "challenger": await context.bot.get_chat_member(chat_id, new_challenger_id).user,
+            "challenged": await context.bot.get_chat_member(chat_id, new_challenged_id).user,
+            "chat_id": chat_id,
+            "rounds": 3,  # Default to best of 3, adjust as needed
+            "challenger_score": 0,
+            "challenged_score": 0,
+            "current_round": 1
+        }
+        
+        # Record new game
+        game_id = await record_game(
+            player1_id=new_challenger_id,
+            player2_id=new_challenged_id,
+            winner_id=None,
+            game_type="challenge",
+            rounds=challenge_data["rounds"],
+            group_id=chat_id if query.message.chat.type != "private" else None
+        )
+        challenge_data["game_id"] = game_id
+        
+        # Add to ongoing challenges
+        ongoing_challenges[f"{new_challenger_id}_{new_challenged_id}"] = challenge_data
+        
+        # Send challenge request
+        keyboard = [
+            [InlineKeyboardButton("✅ Accept", callback_data=f"accept_{new_challenger_id}_{new_challenged_id}")],
+            [InlineKeyboardButton("❌ Decline", callback_data=f"decline_{new_challenger_id}_{new_challenged_id}")]
+        ]
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=(
+                f"🔥 <b>Rematch Challenge!</b> 🔥\n"
+                f"{challenge_data['challenger'].first_name} challenges {challenge_data['challenged'].first_name} "
+                f"to a {challenge_data['rounds']}-round game!\n"
+                f"Do you accept?"
+            ),
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.HTML
+        )
+        
+        # Delete rematch button message
+        await query.message.delete()
+    except Exception as e:
+        logger.error(f"Error starting rematch for users {new_challenger_id} vs {new_challenged_id}: {e}")
+        await query.message.reply_text("⚠️ Error starting rematch. Please try again.")
+
 
 async def update_game_winner(game_id, winner_id):
     """Update the game record with the winner ID."""
