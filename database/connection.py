@@ -349,18 +349,20 @@ async def record_game(player1_id, player2_id, winner_id, game_type, rounds, grou
         await conn.commit()
         return game_id
 
-async def record_round(game_id, round_number, player1_move, player2_move, winner_id=None):
-    """Record details of an individual round."""
+async def record_game(player1_id, player2_id, winner_id, game_type, rounds, group_id=None):
+    """Record a completed game in the history."""
     async with get_db_connection() as conn:
-        await conn.execute('''
-            INSERT INTO round_details 
-            (game_id, round_number, player1_move, player2_move, winner_id) 
-            VALUES (?, ?, ?, ?, ?)
-        ''', (game_id, round_number, player1_move, player2_move, winner_id))
+        cursor = await conn.execute('''
+            INSERT INTO game_history 
+            (player1_id, player2_id, winner_id, game_type, rounds, group_id) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (player1_id, player2_id, winner_id, game_type, rounds, group_id))
+        game_id = cursor.lastrowid
         await conn.commit()
+        return game_id
 
 async def get_leaderboard(category='wins', limit=10):
-    """Get the leaderboard for a specific category."""
+    """Get the leaderboard for challenge mode statistics."""
     query_map = {
         'wins': '''
             SELECT u.user_id, u.first_name, u.last_name, s.total_wins, s.level, s.experience_points
@@ -400,8 +402,9 @@ async def get_leaderboard(category='wins', limit=10):
             return [dict(result) for result in results]
 
 async def get_user_stats(user_id):
-    """Get comprehensive stats for a user."""
+    """Get comprehensive stats for a user, including challenge and bot games."""
     async with get_db_connection() as conn:
+        # Fetch challenge stats
         async with conn.execute('''
             SELECT u.first_name, u.last_name, u.username, u.joined_date,
                    s.total_games, s.total_wins, s.total_losses, s.total_ties,
@@ -417,34 +420,78 @@ async def get_user_stats(user_id):
             if not user_stats:
                 return None
                 
-            # Calculate win rate
-            total_games = user_stats['total_games']
-            win_rate = round((user_stats['total_wins'] / total_games) * 100, 1) if total_games > 0 else 0
+        # Fetch bot stats
+        async with conn.execute('''
+            SELECT total_games AS bot_games, total_wins AS bot_wins, total_losses AS bot_loss,
+                   total_ties AS bot_ties, rock_played AS bot_rock_played,
+                   paper_played AS bot_paper_played, scissor_played AS bot_scissor_played
+            FROM bot_stats
+            WHERE user_id = ?
+        ''', (user_id,)) as cursor:
+            bot_stats = await cursor.fetchone()
             
-            # Get favorite move
-            moves = {
-                'rock': user_stats['rock_played'],
-                'paper': user_stats['paper_played'],
-                'scissor': user_stats['scissor_played']
-            }
-            favorite_move = max(moves, key=moves.get) if sum(moves.values()) > 0 else None
-            
-            # Get position on leaderboard
-            async with conn.execute('''
-                SELECT COUNT(*) + 1 as rank
-                FROM stats
-                WHERE total_wins > (SELECT total_wins FROM stats WHERE user_id = ?)
-            ''', (user_id,)) as rank_cursor:
-                rank = await rank_cursor.fetchone()
+            if not bot_stats:
+                bot_stats = {
+                    'bot_games': 0,
+                    'bot_wins': 0,
+                    'bot_loss': 0,
+                    'bot_ties': 0,
+                    'bot_rock_played': 0,
+                    'bot_paper_played': 0,
+                    'bot_scissor_played': 0
+                }
+            else:
+                bot_stats = dict(bot_stats)
+        
+        # Calculate challenge mode win rate
+        total_games = user_stats['total_games']
+        win_rate = round((user_stats['total_wins'] / total_games) * 100, 1) if total_games > 0 else 0
+        
+        # Calculate bot mode win rate
+        bot_games = bot_stats['bot_games']
+        bot_win_rate = round((bot_stats['bot_wins'] / bot_games) * 100, 1) if bot_games > 0 else 0
+        
+        # Get favorite move for challenge mode
+        moves = {
+            'rock': user_stats['rock_played'],
+            'paper': user_stats['paper_played'],
+            'scissor': user_stats['scissor_played']
+        }
+        favorite_move = max(moves, key=moves.get) if sum(moves.values()) > 0 else None
+        
+        # Get favorite move for bot mode
+        bot_moves = {
+            'rock': bot_stats['bot_rock_played'],
+            'paper': bot_stats['bot_paper_played'],
+            'scissor': bot_stats['bot_scissor_played']
+        }
+        bot_favorite_move = max(bot_moves, key=bot_moves.get) if sum(bot_moves.values()) > 0 else None
+        
+        # Get position on challenge mode leaderboard
+        async with conn.execute('''
+            SELECT COUNT(*) + 1 as rank
+            FROM stats
+            WHERE total_wins > (SELECT total_wins FROM stats WHERE user_id = ?)
+        ''', (user_id,)) as rank_cursor:
+            rank = await rank_cursor.fetchone()
                 
-            result = dict(user_stats)
-            result.update({
-                'win_rate': win_rate,
-                'favorite_move': favorite_move,
-                'leaderboard_rank': rank['rank']
-            })
-            
-            return result
+        result = dict(user_stats)
+        result.update({
+            'win_rate': win_rate,
+            'favorite_move': favorite_move,
+            'leaderboard_rank': rank['rank'],
+            'bot_games': bot_stats['bot_games'],
+            'bot_wins': bot_stats['bot_wins'],
+            'bot_losses': bot_stats['bot_loss'],
+            'bot_ties': bot_stats['bot_ties'],
+            'bot_win_rate': bot_win_rate,
+            'bot_favorite_move': bot_favorite_move,
+            'bot_rock_played': bot_stats['bot_rock_played'],
+            'bot_paper_played': bot_stats['bot_paper_played'],
+            'bot_scissor_played': bot_stats['bot_scissor_played']
+        })
+        
+        return result
 
 async def get_system_stats():
     """Get overall system statistics."""
