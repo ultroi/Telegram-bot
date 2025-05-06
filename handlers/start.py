@@ -29,7 +29,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Create a welcome message with interactive buttons
     welcome_text = (
-        f"👋 <b>Welcome {user.first_name} to Rock Paper Scissors Challenge!</b> 👋\n\n"
+        f"👋 <b>Welcome {user.first_name} to <b>Trihand GameBot</b>!</b> 👋\n\n"
         "🎮 <i>Challenge your friends to epic battles and see who's the ultimate champion!</i>\n\n"
         "🪨 📄 ✂️ <b>How to play:</b>\n"
         "1. Use /challenge in a group (reply to someone's message)\n"
