@@ -2,7 +2,6 @@ import os
 import logging
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
-from database.connection import ensure_tables_exist
 from handlers.start import start
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler
 from handlers.stats import stats, leaderboard, achievements_callback, back_to_stats_callback, leaderboard_callback
