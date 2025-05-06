@@ -7,6 +7,7 @@ from database.connection import (
 ensure_tables_exist,
 update_user_activity,
 get_user_stats,
+get_user_bot_stats,
 get_leaderboard,
 get_user_achievements,
 update_stats,
