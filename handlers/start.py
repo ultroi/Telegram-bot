@@ -183,7 +183,6 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     stats_text += f"Favorite Move: {favorite_move_emoji} {favorite_move.capitalize()}\n"
             
             keyboard = [
-                [InlineKeyboardButton("🏅 View Achievements", callback_data=f"achievements_{user.id}")],
                 [InlineKeyboardButton("🔙 Back", callback_data="back_to_start")]
             ]
             
