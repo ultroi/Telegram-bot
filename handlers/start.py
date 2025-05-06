@@ -317,7 +317,7 @@ async def handle_bot_move(update: Update, context: ContextTypes.DEFAULT_TYPE):
             player1_id=user.id,
             player2_id=context.bot.id,
             winner_id=winner_id,
-            game_type='regular',
+            game_type='bot',  # Use 'bot' game type
             rounds=1
         )
         
@@ -330,19 +330,15 @@ async def handle_bot_move(update: Update, context: ContextTypes.DEFAULT_TYPE):
             winner_id=winner_id
         )
         
-        # Update player stats
-        level_up, new_level = await update_stats(user.id, 'regular', result, player_move)
+        # Update player bot stats
+        await update_bot_stats(user.id, result, player_move)
         
         # Check for achievements
-        stats = await get_user_stats(user.id)
+        stats = await get_user_bot_stats(user.id)  # New function to get bot stats
         if stats['total_games'] == 1:
-            await add_achievement(user.id, "First Game", "Played your first game!")
+            await add_achievement(user.id, "First Bot Game", "Played your first game against the bot!")
         if result == 'win' and stats['total_wins'] == 1:
-            await add_achievement(user.id, "First Win", "Won your first game!")
-        
-        # Prepare response
-        if level_up:
-            result_text += f"\n\n🎉 Level Up! You reached Level {new_level}!"
+            await add_achievement(user.id, "First Bot Win", "Won your first game against the bot!")
     
     except Exception as e:
         logger.error(f"Error processing bot game for user {user.id}: {e}")
