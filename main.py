@@ -2,7 +2,7 @@ import os
 import logging
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
-from handlers.start import start
+from handlers.start import start, start_callback, handle_bot_move
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler
 from handlers.stats import stats, leaderboard, achievements_callback, back_to_stats_callback, leaderboard_callback
 from dotenv import load_dotenv
@@ -35,6 +35,8 @@ app.add_handler(CallbackQueryHandler(move_callback, pattern=r"^move_(rock|paper|
 app.add_handler(CallbackQueryHandler(achievements_callback, pattern=r"^achievements_\d+$"))
 app.add_handler(CallbackQueryHandler(back_to_stats_callback, pattern=r"^back_to_stats_\d+$"))
 app.add_handler(CallbackQueryHandler(leaderboard_callback, pattern=r"^leaderboard_.*$"))
+app.add_handler(CallbackQueryHandler(start_callback, pattern="^(help|stats|quick_game|leaderboard|achievements|back_to_start)$"))
+app.add_handler(CallbackQueryHandler(handle_bot_move, pattern="^bot_move_"))
 
 
 # Error handler
