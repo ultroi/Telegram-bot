@@ -19,7 +19,7 @@ async def ensure_tables_exist():
     """Ensure all necessary tables exist in the database."""
     async with get_db_connection() as conn:
         try:
-            # Users table - stores user information
+            # Users table - unchanged
             await conn.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
@@ -30,8 +30,8 @@ async def ensure_tables_exist():
                 last_active TEXT DEFAULT CURRENT_TIMESTAMP
             )
             ''')
-            
-            # Groups table - stores group information
+
+            # Groups table - unchanged
             await conn.execute('''
             CREATE TABLE IF NOT EXISTS groups (
                 group_id INTEGER PRIMARY KEY,
@@ -42,8 +42,8 @@ async def ensure_tables_exist():
                 member_count INTEGER DEFAULT 0
             )
             ''')
-            
-            # Game stats table - stores detailed game statistics
+
+            # Challenge stats table - stores challenge mode statistics
             await conn.execute('''
             CREATE TABLE IF NOT EXISTS stats (
                 user_id INTEGER PRIMARY KEY,
@@ -62,15 +62,30 @@ async def ensure_tables_exist():
                 FOREIGN KEY (user_id) REFERENCES users(user_id)
             )
             ''')
-            
-            # Game history table - stores individual game records
+
+            # Bot stats table - stores bot game statistics
+            await conn.execute('''
+            CREATE TABLE IF NOT EXISTS bot_stats (
+                user_id INTEGER PRIMARY KEY,
+                total_games INTEGER DEFAULT 0,
+                total_wins INTEGER DEFAULT 0,
+                total_losses INTEGER DEFAULT 0,
+                total_ties INTEGER DEFAULT 0,
+                rock_played INTEGER DEFAULT 0,
+                paper_played INTEGER DEFAULT 0,
+                scissor_played INTEGER DEFAULT 0,
+                FOREIGN KEY (user_id) REFERENCES users(user_id)
+            )
+            ''')
+
+            # Game history table - modified to allow player2_id to be nullable and add 'bot' game_type
             await conn.execute('''
             CREATE TABLE IF NOT EXISTS game_history (
                 game_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 player1_id INTEGER NOT NULL,
-                player2_id INTEGER NOT NULL,
+                player2_id INTEGER,
                 winner_id INTEGER,
-                game_type TEXT CHECK(game_type IN ('regular', 'challenge')) NOT NULL,
+                game_type TEXT CHECK(game_type IN ('regular', 'challenge', 'bot')) NOT NULL,
                 rounds INTEGER DEFAULT 1,
                 date_played TEXT DEFAULT CURRENT_TIMESTAMP,
                 group_id INTEGER,
@@ -80,8 +95,8 @@ async def ensure_tables_exist():
                 FOREIGN KEY (group_id) REFERENCES groups(group_id)
             )
             ''')
-            
-            # Round details table - stores each round's moves and results
+
+            # Round details table - unchanged
             await conn.execute('''
             CREATE TABLE IF NOT EXISTS round_details (
                 round_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -94,8 +109,8 @@ async def ensure_tables_exist():
                 FOREIGN KEY (winner_id) REFERENCES users(user_id)
             )
             ''')
-            
-            # Achievements table - for tracking user achievements
+
+            # Achievements table - unchanged
             await conn.execute('''
             CREATE TABLE IF NOT EXISTS achievements (
                 achievement_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,7 +121,7 @@ async def ensure_tables_exist():
                 FOREIGN KEY (user_id) REFERENCES users(user_id)
             )
             ''')
-            
+
             await conn.commit()
             print("All tables created successfully!")
         except sqlite3.Error as e:
@@ -127,12 +142,79 @@ async def update_user_activity(user_id, first_name, last_name=None, username=Non
                 last_active = excluded.last_active
         ''', (user_id, first_name, last_name or "", username or "", current_time))
         
-        # Make sure user exists in stats table
+        # Initialize stats for challenge mode
         await conn.execute('''
             INSERT INTO stats (user_id)
             VALUES (?)
             ON CONFLICT(user_id) DO NOTHING
         ''', (user_id,))
+        
+        # Initialize stats for bot games
+        await conn.execute('''
+            INSERT INTO bot_stats (user_id)
+            VALUES (?)
+            ON CONFLICT(user_id) DO NOTHING
+        ''', (user_id,))
+        
+        await conn.commit()
+
+
+async def update_bot_stats(user_id, result, move=None):
+    """Update user bot game statistics after a game."""
+    async with get_db_connection() as conn:
+        # Fetch current bot stats
+        async with conn.execute('SELECT * FROM bot_stats WHERE user_id = ?', (user_id,)) as cursor:
+            stats = await cursor.fetchone()
+            
+            if not stats:
+                # Initialize bot stats for new user
+                await conn.execute('''
+                    INSERT INTO bot_stats (user_id) VALUES (?)
+                ''', (user_id,))
+                stats = {
+                    'total_games': 0,
+                    'total_wins': 0,
+                    'total_losses': 0,
+                    'total_ties': 0,
+                    'rock_played': 0,
+                    'paper_played': 0,
+                    'scissor_played': 0
+                }
+        
+        # Update move counts
+        if move:
+            if move == 'rock':
+                rock_played = stats['rock_played'] + 1
+                await conn.execute('UPDATE bot_stats SET rock_played = ? WHERE user_id = ?', 
+                                (rock_played, user_id))
+            elif move == 'paper':
+                paper_played = stats['paper_played'] + 1
+                await conn.execute('UPDATE bot_stats SET paper_played = ? WHERE user_id = ?', 
+                                (paper_played, user_id))
+            elif move == 'scissor':
+                scissor_played = stats['scissor_played'] + 1
+                await conn.execute('UPDATE bot_stats SET scissor_played = ? WHERE user_id = ?', 
+                                (scissor_played, user_id))
+        
+        # Update game stats
+        total_games = stats['total_games'] + 1
+        
+        if result == 'win':
+            total_wins = stats['total_wins'] + 1
+            await conn.execute('UPDATE bot_stats SET total_wins = ? WHERE user_id = ?', 
+                            (total_wins, user_id))
+        elif result == 'loss':
+            total_losses = stats['total_losses'] + 1
+            await conn.execute('UPDATE bot_stats SET total_losses = ? WHERE user_id = ?', 
+                            (total_losses, user_id))
+        elif result == 'tie':
+            total_ties = stats['total_ties'] + 1
+            await conn.execute('UPDATE bot_stats SET total_ties = ? WHERE user_id = ?', 
+                            (total_ties, user_id))
+        
+        # Update total games
+        await conn.execute('UPDATE bot_stats SET total_games = ? WHERE user_id = ?', 
+                         (total_games, user_id))
         
         await conn.commit()
 
