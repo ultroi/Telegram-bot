@@ -30,7 +30,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Create a welcome message with interactive buttons
     welcome_text = (
         f"👋 <b>Welcome {user.first_name} to <b>Trihand GameBot</b>!</b> 👋\n\n"
-        "🎮 <i>Challenge your friends to epic battles and see who's the ultimate champion!</i>\n\n"
+        "Trihand is a fast-paced, multiplayer version of the classic <b>Rock 🪨, Paper 📄, Scissors ✂️</b> game – now with up to <b>10 intense rounds</b> per match!\n\n"
+        "🎮 <i>Challenge your friends, outsmart their moves, and become the ultimate RPS Champion!</i>\n\n"
         "🪨 📄 ✂️ <b>How to play:</b>\n"
         "1. Use /challenge in a group (reply to someone's message)\n"
         "2. Wait for them to accept\n"
