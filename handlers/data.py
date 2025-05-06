@@ -3,7 +3,6 @@ import asyncio
 import sqlite3
 from handlers.connection import get_db_connection, ensure_tables_exist  
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from uuid import uuid4
 
 # Configure logging
