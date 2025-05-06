@@ -3,13 +3,13 @@ import logging
 import asyncio
 import signal
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes, ChatMemberHandler
 from handlers.start import start, start_callback, handle_bot_move
 from handlers.mod import stats, leaderboard, achievements_callback, back_to_stats_callback, leaderboard_callback, admin_stats
 from handlers.challenge import challenge, challenge_callback, move_callback, clear_challenges_command, handle_rematch
 from handlers.data import manage_data_command, manage_data_callback
 from database.connection import ensure_tables_exist, migrate_stats
-from handlers.group_handler import add_group_handlers
+from handlers.group_handler import ChatMemberHandler
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -72,8 +72,7 @@ async def main():
     app.add_handler(CallbackQueryHandler(handle_rematch, pattern="^rematch_"))
     app.add_handler(CommandHandler("mdata", manage_data_command))
     app.add_handler(CallbackQueryHandler(manage_data_callback, pattern="^(confirm_wipe_all|cancel_wipe_all|confirm_delete_user|cancel_delete_user|confirm_delete_group|cancel_delete_group)_"))
-    
-    group_handlers(app)
+    app.add_handler(ChatMemberHandler(chat_member_update, ChatMemberHandler.MY_CHAT_MEMBER))
     app.add_error_handler(error_handler)
 
     # Set up signal handlers for graceful shutdown
