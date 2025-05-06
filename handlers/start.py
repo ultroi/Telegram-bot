@@ -146,12 +146,42 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     
     elif action == "back_to_start":
-        # Create a fake update object to reuse the start command
-        class FakeUpdate:
-            def __init__(self, message):
-                self.message = message
-        
-        await start(FakeUpdate(query.message), context)
+        welcome_text = (
+            f"👋 <b>Welcome {user.first_name} to Rock Paper Scissors Challenge!</b> 👋\n\n"
+            "🎮 <i>Challenge your friends to epic battles and see who's the ultimate champion!</i>\n\n"
+            "🪨 📄 ✂️ <b>How to play:</b>\n"
+            "1. Use /challenge in a group (reply to someone's message)\n"
+            "2. Wait for them to accept\n"
+            "3. Make your move when it's your turn\n"
+            "4. Best of 1-10 rounds wins!\n\n"
+            "🏆 <b>Features:</b>\n"
+            "- Track your win/loss stats\n"
+            "- Earn achievements\n"
+            "- Level up as you play\n"
+            "- Rematch option after games"
+        )
+
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("📖 How to Play", callback_data="help"),
+                InlineKeyboardButton("📊 My Stats", callback_data="stats")
+                ],
+                [
+                InlineKeyboardButton("🎮 Quick Game (vs Bot)", callback_data="quick_game"),
+                InlineKeyboardButton("👥 Challenge Friends", switch_inline_query="")
+            ],
+            [
+                InlineKeyboardButton("🏆 Leaderboard", callback_data="leaderboard"),
+                InlineKeyboardButton("🌟 Achievements", callback_data="achievements")
+            ]
+        ])
+
+        await query.edit_message_caption(
+            caption=welcome_text,
+            reply_markup=keyboard,
+            parse_mode=ParseMode.HTML
+        )
+
 
 async def start_bot_game(query, context):
     """Start a quick game against the bot."""
