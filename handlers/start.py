@@ -2,6 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from telegram.constants import ParseMode
 import random
+import logging
 from database.connection import update_user_activity, get_user_stats, get_leaderboard, get_user_achievements, update_stats, record_game, record_round, add_achievement
 
 #Set up logging
