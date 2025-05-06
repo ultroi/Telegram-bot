@@ -73,7 +73,7 @@ async def main():
     app.add_handler(CommandHandler("mdata", manage_data_command))
     app.add_handler(CallbackQueryHandler(manage_data_callback, pattern="^(confirm_wipe_all|cancel_wipe_all|confirm_delete_user|cancel_delete_user|confirm_delete_group|cancel_delete_group)_"))
     
-    add_group_handlers(app)+
+    add_group_handlers(app)
     app.add_error_handler(error_handler)
 
     # Set up signal handlers for graceful shutdown
