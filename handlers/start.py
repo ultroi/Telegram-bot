@@ -253,7 +253,9 @@ async def start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         "first_bot_win": "🎮",
                         "veteran": "🏆",
                         "comeback": "💪",
-                        "lucky": "🍀"
+                        "lucky": "🍀",
+                        "streak_winner": "🔥",
+                        "move_master": "🎯"
                     }.get(ach['achievement_type'], "🎖️")
                     
                     achievements_text += f"{achievement_icon} <b>{ach['achievement_type'].replace('_', ' ').title()}</b>\n"
