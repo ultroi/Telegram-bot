@@ -4,7 +4,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from handlers.start import start, start_callback, handle_bot_move
 from handlers.mod import stats, leaderboard, achievements_callback, back_to_stats_callback, leaderboard_callback, admin_stats
-from handlers.challenge import challenge, challenge_callback, move_callback, clear_challenges_command
+from handlers.challenge import challenge, challenge_callback, move_callback, clear_challenges_command, handle_rematch
 from handlers.data import manage_data_command, manage_data_callback
 from dotenv import load_dotenv
 
@@ -39,6 +39,7 @@ app.add_handler(CallbackQueryHandler(back_to_stats_callback, pattern=r"^back_to_
 app.add_handler(CallbackQueryHandler(leaderboard_callback, pattern=r"^leaderboard_.*$"))
 app.add_handler(CallbackQueryHandler(start_callback, pattern="^(help|stats|quick_game|leaderboard|achievements|back_to_start)$"))
 app.add_handler(CallbackQueryHandler(handle_bot_move, pattern="^bot_move_"))
+app.add_handler(CallbackQueryHandler(handle_rematch, pattern="^rematch_"))
 app.add_handler(CommandHandler("mdata", manage_data_command))
 app.add_handler(CallbackQueryHandler(manage_data_callback, pattern="^(confirm_wipe_all|cancel_wipe_all|confirm_delete_user|cancel_delete_user|confirm_delete_group|cancel_delete_group)_"))
 
