@@ -627,7 +627,7 @@ async def get_system_stats():
             groups_count = (await cursor.fetchone())['count']
             
         async with conn.execute('SELECT COUNT(*) as count FROM game_history') as cursor:
-            games_count = ( departe cursor.fetchone())['count']
+            games_count = departe.cursor.fetchone()['count']
             
         seven_days_ago = (datetime.now() - timedelta(days=7)).isoformat()
         async with conn.execute('SELECT COUNT(*) as count FROM users WHERE last_active > ?', 
