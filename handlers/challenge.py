@@ -464,8 +464,8 @@ async def end_game(context, challenge_data):
             f"<i>With a score of {winner_score}-{loser_score}</i>"
         )
         
-        # Update stats for both players
-        level_up, _ = await update_stats(winner.id, "challenge", "win")
+        # Update stats for both players (only for challenge mode)
+        level_up, new_level = await update_stats(winner.id, "challenge", "win")
         await update_stats(loser.id, "challenge", "loss")
         
         # Check for achievements
@@ -480,7 +480,7 @@ async def end_game(context, challenge_data):
         
         # Add level up notification if applicable
         if level_up:
-            result_text += f"\n\n⬆️ <b>{winner.first_name} leveled up!</b> ⬆️"
+            result_text += f"\n\n⬆️ <b>{winner.first_name} leveled up to {new_level}!</b> ⬆️"
             
     else:
         result_text = (
@@ -491,7 +491,7 @@ async def end_game(context, challenge_data):
             f"🤝 <b>It's a TIE!</b> 🤝"
         )
         
-        # Update stats for both players (tie)
+        # Update stats for both players (only for challenge mode)
         await update_stats(challenger.id, "challenge", "tie")
         await update_stats(challenged.id, "challenge", "tie")
     
