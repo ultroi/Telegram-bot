@@ -17,6 +17,7 @@ update_bot_stats,
 record_round,
 add_achievement
 )
+from handlers.mod import format_leaderboard
 
 #Set up logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
