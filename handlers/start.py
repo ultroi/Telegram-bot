@@ -3,7 +3,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 from telegram.constants import ParseMode
 import random
 import logging
-from database.connection import ensure_tables_exist, update_user_activity, get_user_stats, get_leaderboard, get_user_achievements, update_stats, record_game, record_round, add_achievement
+from database.connection import ensure_tables_exist, update_user_activity, get_user_stats, get_leaderboard, get_user_achievements, update_stats, record_game, update_bot_stats, get_user_bot_stats, record_round, add_achievement
 
 #Set up logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
