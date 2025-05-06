@@ -49,4 +49,4 @@ app.add_error_handler(error_handler)
 # Run the bot
 if __name__ == "__main__":
     logger.info("Starting bot...")
-    application.run_polling()
+    app.run_polling()
