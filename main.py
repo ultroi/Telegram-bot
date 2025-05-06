@@ -27,11 +27,12 @@ app = ApplicationBuilder().token(BOT_TOKEN).build()
 
 # Register command handlers
 app.add_handler(CommandHandler("start", start))
-# Command handlers
 app.add_handler(CommandHandler("stats", stats))
 app.add_handler(CommandHandler("leaderboard", leaderboard))
-
-# CallbackQuery handlers
+app.add_handler(CommandHandler("clearchallenges", clear_challenges_command))
+app.add_handler(CommandHandler("challenge", challenge))
+app.add_handler(CallbackQueryHandler(challenge_callback, pattern=r"^(accept|decline)_"))
+app.add_handler(CallbackQueryHandler(move_callback, pattern=r"^move_(rock|paper|scissor)_"))
 app.add_handler(CallbackQueryHandler(achievements_callback, pattern=r"^achievements_\d+$"))
 app.add_handler(CallbackQueryHandler(back_to_stats_callback, pattern=r"^back_to_stats_\d+$"))
 app.add_handler(CallbackQueryHandler(leaderboard_callback, pattern=r"^leaderboard_.*$"))
