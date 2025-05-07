@@ -9,7 +9,7 @@ from handlers.mod import stats, leaderboard, achievements_callback, back_to_stat
 from handlers.challenge import challenge, challenge_callback, move_callback, clear_challenges_command, handle_rematch
 from handlers.data import manage_data_command, manage_data_callback
 from handlers.group_handler import chat_member_update
-from handler.connection import ensure_tables_exist
+from handlers.connection import ensure_tables_exist
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
