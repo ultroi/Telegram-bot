@@ -8,7 +8,7 @@ from handlers.start import start, start_callback, handle_bot_move
 from handlers.mod import stats, leaderboard, achievements_callback, back_to_stats_callback, leaderboard_callback, admin_stats
 from handlers.challenge import challenge, challenge_callback, move_callback, clear_challenges_command, handle_rematch
 from handlers.data import manage_data_command, manage_data_callback
-from database.connection import ensure_tables_exist, migrate_stats
+from database.connection import ensure_tables_exist, migrate_stats, migrate_schema, get_db_connection
 from handlers.group_handler import chat_member_update
 from dotenv import load_dotenv
 
@@ -43,6 +43,30 @@ def handle_shutdown(loop, application):
     loop.close()
     logger.info("Event loop closed.")
 
+async def create_migration_version_table():
+    """Create a table to track schema migrations."""
+    async with get_db_connection() as conn:
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS migration_version (
+                id INTEGER PRIMARY KEY,
+                version TEXT NOT NULL,
+                migrated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        await conn.commit()
+
+async def check_and_migrate():
+    """Check if migration is required and perform migration."""
+    async with get_db_connection() as conn:
+        # Check if migration has already been done
+        result = await conn.execute('SELECT version FROM migration_version ORDER BY migrated_at DESC LIMIT 1')
+        version = await result.fetchone()
+
+        if version is None or version[0] != '1.0':  # Example version check
+            await migrate_schema()  # Run migration only if version doesn't match
+            await conn.execute('INSERT INTO migration_version (version) VALUES ("1.0")')  # Update version to "1.0"
+            await conn.commit()
+
 # Error handler
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.error(f"Update {update} caused error: {context.error}")
@@ -51,7 +75,8 @@ async def main():
     """Main function to run the bot."""
     logger.info("Initializing bot...")
     await ensure_tables_exist()
-    await migrate_stats()
+    await create_migration_version_table()
+    await check_and_migrate()
     
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
