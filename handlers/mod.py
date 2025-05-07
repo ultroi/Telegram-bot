@@ -384,24 +384,23 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    data = query.data.split("_")
-    action = data[0]
-
-    try:
-        if action in ["back", "home"]:
-            message = "🏆 <b>Game Leaderboard</b>\n\nSelect a category to view the leaderboard:"
-            keyboard = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("🏆 Wins", callback_data="leaderboard_wins_0"),
-                    InlineKeyboardButton("🎯 Challenges", callback_data="leaderboard_challenge_wins_0")
-                ],
-                [
-                    InlineKeyboardButton("⭐ Levels", callback_data="leaderboard_level_0"),
-                    InlineKeyboardButton("🎮 Most Active", callback_data="leaderboard_games_0")
-                ],
-                [InlineKeyboardButton("🔙 Back", callback_data="back")]
-            ])
-            return await safe_edit_or_reply(query, message, keyboard)
+    
+    if query.data == "back":
+        # Show main leaderboard menu
+        message = "🏆 <b>Game Leaderboard</b>\n\nSelect a category to view the leaderboard:"
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🏆 Wins", callback_data="leaderboard_wins_0"),
+                InlineKeyboardButton("🎯 Challenges", callback_data="leaderboard_challenge_wins_0")
+            ],
+            [
+                InlineKeyboardButton("⭐ Levels", callback_data="leaderboard_level_0"),
+                InlineKeyboardButton("🎮 Most Active", callback_data="leaderboard_games_0")
+            ],
+            [InlineKeyboardButton("🔙 Back to Main Menu", callback_data="back_to_start")]
+        ])
+        await query.edit_message_text(text=message, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+        return await safe_edit_or_reply(query, message, keyboard)
 
         category = data[1] if len(data) > 1 else "wins"
         group_id = int(data[2]) if len(data) > 2 and data[2].isdigit() else None
@@ -596,12 +595,17 @@ async def confirm_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def safe_edit_or_reply(query, message, keyboard):
+async def safe_edit_or_reply(query, text, reply_markup=None, parse_mode=ParseMode.HTML):
     try:
-        if hasattr(query.message, "photo") and query.message.photo:
-            await query.edit_message_caption(caption=message, parse_mode=ParseMode.HTML, reply_markup=keyboard)
-        else:
-            await query.edit_message_text(text=message, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+        await query.edit_message_text(
+            text=text,
+            parse_mode=parse_mode,
+            reply_markup=reply_markup
+        )
     except Exception as e:
-        logger.warning(f"Fallback to reply due to edit error: {e}")
-        await query.message.reply_text(text=message, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+        logger.error(f"Error editing message: {e}")
+        await query.message.reply_text(
+            text=text,
+            parse_mode=parse_mode,
+            reply_markup=reply_markup
+        )
