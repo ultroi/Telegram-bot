@@ -20,7 +20,7 @@ async def get_db_connection():
 async def is_admin(user_id):
     """Check if a user is an admin."""
     # Replace with your admin IDs
-    return user_id in [123456789, 987654321]  # Update with actual admin IDs
+    return user_id in [5956598856]  # Update with actual admin IDs
 
 async def ensure_tables_exist():
     """Ensure all necessary tables and indexes exist in the database."""
