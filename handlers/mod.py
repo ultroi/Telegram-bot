@@ -343,251 +343,89 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show the game leaderboard (global in PM, group-specific in GC)."""
     user = update.message.from_user
     chat = update.effective_chat
-    
-    # Update user activity
+
     await update_user_activity(user.id, user.first_name, user.last_name, user.username)
-    
-    # Determine category
+
     category = "wins"
     if context.args:
         arg = context.args[0].lower()
-        if arg in ["wins", "challenge", "level", "games"]:
-            category = "challenge_wins" if arg == "challenge" else arg
-    
+        category = "challenge_wins" if arg == "challenge" else arg if arg in ["wins", "challenge", "level", "games"] else "wins"
+
     try:
-        if chat.type == "private":
-            # Show global leaderboard in PM
-            leaders = await get_leaderboard(category, 10)
-            if not leaders or len(leaders) == 0:
-                message = f"⚠️ No {category.replace('_', ' ')} data found."
-                keyboard = InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton(text="🏆 Wins", callback_data="leaderboard_wins_0"),
-                        InlineKeyboardButton(text="🎯 Challenges", callback_data="leaderboard_challenge_wins_0")
-                    ],
-                    [
-                        InlineKeyboardButton(text="⭐️ Levels", callback_data="leaderboard_level_0"),
-                        InlineKeyboardButton(text="🎮 Most Active", callback_data="leaderboard_games_0")
-                    ],
-                    [InlineKeyboardButton(text="🔙 Back", callback_data="back")]
-                ])
-            else:
-                message, keyboard = await format_leaderboard(leaders, category)
+        is_private = chat.type == "private"
+        group_id = None if is_private else chat.id
+        fetch_func = get_leaderboard if is_private else get_group_leaderboard
+
+        leaders = await fetch_func(category, 10) if is_private else await fetch_func(chat.id, category, 10)
+
+        if not leaders:
+            message = f"⚠️ No {'global' if is_private else 'group'} {category.replace('_', ' ')} data found."
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🏆 Wins", callback_data=f"leaderboard_wins_{group_id or 0}"),
+                    InlineKeyboardButton("🎯 Challenges", callback_data=f"leaderboard_challenge_wins_{group_id or 0}")
+                ],
+                [
+                    InlineKeyboardButton("⭐ Levels", callback_data=f"leaderboard_level_{group_id or 0}"),
+                    InlineKeyboardButton("🎮 Most Active", callback_data=f"leaderboard_games_{group_id or 0}")
+                ],
+                [InlineKeyboardButton("🔙 Back", callback_data="back")]
+            ])
         else:
-            # Show group leaderboard in group chat
-            group_id = chat.id
-            leaders = await get_group_leaderboard(group_id, category, 10)
-            if not leaders or len(leaders) == 0:
-                message = f"⚠️ No group {category.replace('_', ' ')} data found."
-                keyboard = InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton(text="🏆 Wins", callback_data=f"leaderboard_group_wins_{group_id}"),
-                        InlineKeyboardButton(text="🎯 Challenges", callback_data=f"leaderboard_group_challenge_wins_{group_id}")
-                    ],
-                    [
-                        InlineKeyboardButton(text="⭐️ Levels", callback_data=f"leaderboard_group_level_{group_id}"),
-                        InlineKeyboardButton(text="🎮 Most Active", callback_data=f"leaderboard_group_games_{group_id}")
-                    ],
-                    [InlineKeyboardButton(text="🌍 View Global Leaderboard", callback_data=f"leaderboard_switch_to_global_{category}_{group_id}")],
-                    [InlineKeyboardButton(text="🔙 Back", callback_data="back")]
-                ])
-            else:
-                message, keyboard = await format_leaderboard(leaders, category, is_group=True, group_id=group_id)
-        
-        await update.message.reply_text(
-            message,
-            parse_mode=ParseMode.HTML,
-            reply_markup=keyboard
-        )
+            message, keyboard = await format_leaderboard(leaders, category, is_group=not is_private, group_id=group_id)
+
+        await update.message.reply_text(message, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
     except Exception as e:
         logger.error(f"Error displaying leaderboard for user {user.id} in chat {chat.id}: {e}")
         await update.message.reply_text("⚠️ Error displaying leaderboard. Please try again.")
 
 
 async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle leaderboard category switches and global/group toggling."""
     query = update.callback_query
     await query.answer()
-
     data = query.data.split("_")
     action = data[0]
 
     try:
-        # Check if "back" action is triggered
-        if action == "back" or action == "home":
-            # Create a simple back message with main menu keyboard
+        if action in ["back", "home"]:
             message = "🏆 <b>Game Leaderboard</b>\n\nSelect a category to view the leaderboard:"
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton(text="🏆 Wins", callback_data="leaderboard_wins_0"),
-                    InlineKeyboardButton(text="🎯 Challenges", callback_data="leaderboard_challenge_wins_0")
+                    InlineKeyboardButton("🏆 Wins", callback_data="leaderboard_wins_0"),
+                    InlineKeyboardButton("🎯 Challenges", callback_data="leaderboard_challenge_wins_0")
                 ],
                 [
-                    InlineKeyboardButton(text="⭐️ Levels", callback_data="leaderboard_level_0"),
-                    InlineKeyboardButton(text="🎮 Most Active", callback_data="leaderboard_games_0")
-                ]
+                    InlineKeyboardButton("⭐ Levels", callback_data="leaderboard_level_0"),
+                    InlineKeyboardButton("🎮 Most Active", callback_data="leaderboard_games_0")
+                ],
+                [InlineKeyboardButton("🔙 Back", callback_data="back")]
             ])
-            
-            try:
-                if hasattr(query.message, 'photo') and query.message.photo:
-                    await query.edit_message_caption(caption=message, parse_mode=ParseMode.HTML, reply_markup=keyboard)
-                else:
-                    await query.edit_message_text(text=message, parse_mode=ParseMode.HTML, reply_markup=keyboard)
-                return
-            except Exception as e:
-                logger.error(f"Error returning to main menu: {e}")
-                # If editing fails, try sending a new message
-                await query.message.reply_text(text=message, parse_mode=ParseMode.HTML, reply_markup=keyboard)
-                return
+            return await safe_edit_or_reply(query, message, keyboard)
 
-        # Regular leaderboard processing
-        if action == "leaderboard" or action == "leaderboard_group":
-            is_group = action == "leaderboard_group"
-            category = data[1]
-            group_id = int(data[2]) if len(data) > 2 and data[2] != "0" else None
+        category = data[1] if len(data) > 1 else "wins"
+        group_id = int(data[2]) if len(data) > 2 and data[2].isdigit() else None
+        is_group = action == "leaderboardgroup" or "switch_to_group" in query.data
 
-            if category not in ("wins", "challenge_wins", "level", "games"):
-                try:
-                    if hasattr(query.message, 'photo') and query.message.photo:
-                        await query.edit_message_caption(caption="⚠️ Invalid leaderboard category!")
-                    else:
-                        await query.edit_message_text(text="⚠️ Invalid leaderboard category!")
-                except Exception:
-                    await query.message.reply_text("⚠️ Invalid leaderboard category!")
-                return
+        if category not in ("wins", "challenge_wins", "level", "games"):
+            return await safe_edit_or_reply(query, "⚠️ Invalid leaderboard category!", InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back")]]))
 
-            try:
-                if is_group:
-                    leaders = await get_group_leaderboard(group_id, category, 10)
-                else:
-                    leaders = await get_leaderboard(category, 10)
-                
-                # Check if there's any data
-                if not leaders or len(leaders) == 0:
-                    message = f"⚠️ No {category.replace('_', ' ')} data found."
-                    # Add a back button
-                    keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton(text="🔙 Back", callback_data="back")]
-                    ])
-                else:
-                    message, keyboard = await format_leaderboard(leaders, category, 
-                                                            is_group=is_group, 
-                                                            group_id=group_id)
-                    
-                    # Back button is already added in format_leaderboard
-            except Exception as e:
-                logger.error(f"Error getting leaderboard data: {e}")
-                message = "⚠️ Error loading leaderboard data."
-                keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton(text="🔙 Back", callback_data="back")]
-                ])
-
-        elif action == "leaderboard_switch_to_global":
-            category = data[1]
-            group_id = int(data[2]) if len(data) > 2 else 0
-
-            if category not in ("wins", "challenge_wins", "level", "games"):
-                try:
-                    if hasattr(query.message, 'photo') and query.message.photo:
-                        await query.edit_message_caption(caption="⚠️ Invalid leaderboard category!")
-                    else:
-                        await query.edit_message_text(text="⚠️ Invalid leaderboard category!")
-                except Exception:
-                    await query.message.reply_text("⚠️ Invalid leaderboard category!")
-                return
-
-            try:
-                leaders = await get_leaderboard(category, 10)
-                
-                if not leaders or len(leaders) == 0:
-                    message = f"⚠️ No global {category.replace('_', ' ')} data found."
-                    keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton(text="🔙 Back", callback_data="back")]
-                    ])
-                else:
-                    message, keyboard = await format_leaderboard(leaders, category, group_id=group_id)
-                    # Back button is already added in format_leaderboard
-            except Exception as e:
-                logger.error(f"Error getting global leaderboard: {e}")
-                message = "⚠️ Error loading global leaderboard data."
-                keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton(text="🔙 Back", callback_data="back")]
-                ])
-
-        elif action == "leaderboard_switch_to_group":
-            category = data[1]
-            group_id = int(data[2]) if len(data) > 2 else 0
-
-            if category not in ("wins", "challenge_wins", "level", "games"):
-                try:
-                    if hasattr(query.message, 'photo') and query.message.photo:
-                        await query.edit_message_caption(caption="⚠️ Invalid leaderboard category!")
-                    else:
-                        await query.edit_message_text(text="⚠️ Invalid leaderboard category!")
-                except Exception:
-                    await query.message.reply_text("⚠️ Invalid leaderboard category!")
-                return
-
-            try:
-                leaders = await get_group_leaderboard(group_id, category, 10)
-                
-                if not leaders or len(leaders) == 0:
-                    message = f"⚠️ No group {category.replace('_', ' ')} data found."
-                    keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton(text="🔙 Back", callback_data="back")]
-                    ])
-                else:
-                    message, keyboard = await format_leaderboard(leaders, category, is_group=True, group_id=group_id)
-                    # Back button is already added in format_leaderboard
-            except Exception as e:
-                logger.error(f"Error getting group leaderboard: {e}")
-                message = "⚠️ Error loading group leaderboard data."
-                keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton(text="🔙 Back", callback_data="back")]
-                ])
+        if "switch_to_global" in query.data:
+            leaders = await get_leaderboard(category, 10)
         else:
-            # Unknown action
-            message = "⚠️ Invalid action."
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton(text="🔙 Back", callback_data="back")]
-            ])
+            leaders = await get_group_leaderboard(group_id, category, 10) if is_group else await get_leaderboard(category, 10)
 
-        # Try to update the existing message with careful error handling for photo messages
-        try:
-            if hasattr(query.message, 'photo') and query.message.photo:
-                await query.edit_message_caption(
-                    caption=message,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=keyboard
-                )
-            else:
-                await query.edit_message_text(
-                    text=message,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=keyboard
-                )
-        except Exception as e:
-            logger.error(f"Error updating message: {e}")
-            # If edit fails, send a new message
-            await query.message.reply_text(
-                text=message,
-                parse_mode=ParseMode.HTML,
-                reply_markup=keyboard
-            )
+        if not leaders:
+            message = f"⚠️ No {'group' if is_group else 'global'} {category.replace('_', ' ')} data found."
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back")]])
+        else:
+            message, keyboard = await format_leaderboard(leaders, category, is_group=is_group, group_id=group_id)
+
+        await safe_edit_or_reply(query, message, keyboard)
 
     except Exception as e:
         logger.error(f"Error handling leaderboard callback for user {query.from_user.id}: {e}")
-        try:
-            # Try to send a new message with error and back button
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton(text="🔙 Back", callback_data="back")]
-            ])
-            await query.message.reply_text(
-                text="⚠️ An error occurred while switching leaderboard. Please try again.",
-                reply_markup=keyboard
-            )
-        except Exception:
-            logger.error("Failed to notify user of error")
+        await query.message.reply_text("⚠️ An error occurred while switching leaderboard.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back")]]))
 
 
 async def show_leaderboard(query, leaders, category):
@@ -596,12 +434,12 @@ async def show_leaderboard(query, leaders, category):
         leaderboard_message = f"⚠️ No {category.replace('_', ' ')} data found."
         keyboard = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("🏆 Wins", callback_data="leaderboard_wins"),
-                InlineKeyboardButton("🎯 Challenges", callback_data="leaderboard_challenge_wins")
+                InlineKeyboardButton("🏆 Wins", callback_data="leaderboard_wins_0"),
+                InlineKeyboardButton("🎯 Challenges", callback_data="leaderboard_challenge_wins_0")
             ],
             [
-                InlineKeyboardButton("⭐ Levels", callback_data="leaderboard_level"),
-                InlineKeyboardButton("🎮 Most Active", callback_data="leaderboard_games")
+                InlineKeyboardButton("⭐ Levels", callback_data="leaderboard_level_0"),
+                InlineKeyboardButton("🎮 Most Active", callback_data="leaderboard_games_0")
             ],
             [InlineKeyboardButton(text="🔙 Back", callback_data="back")]
         ])
@@ -609,7 +447,7 @@ async def show_leaderboard(query, leaders, category):
         leaderboard_message = "🏅 <b>Leaderboard</b> 🏅\n\n"
         for rank, leader in enumerate(leaders, start=1):
             rank_display = f"#{rank}"
-            name = leader.get("name", leader.get("first_name", "Unknown"))
+            name = f"{leader.get('first_name', 'Unknown')} {leader.get('last_name', '')}".strip()
             if category == "wins":
                 leaderboard_message += f"{rank_display} <b>{name}</b> - {leader['total_wins']} wins (Level {leader['level']})\n"
             elif category == "challenge_wins":
@@ -621,12 +459,12 @@ async def show_leaderboard(query, leaders, category):
         
         keyboard = [
             [
-                InlineKeyboardButton("🏆 Wins", callback_data="leaderboard_wins"),
-                InlineKeyboardButton("🎯 Challenges", callback_data="leaderboard_challenge_wins")
+                InlineKeyboardButton("🏆 Wins", callback_data="leaderboard_wins_0"),
+                InlineKeyboardButton("🎯 Challenges", callback_data="leaderboard_challenge_wins_0")
             ],
             [
-                InlineKeyboardButton("⭐ Levels", callback_data="leaderboard_level"),
-                InlineKeyboardButton("🎮 Most Active", callback_data="leaderboard_games")
+                InlineKeyboardButton("⭐ Levels", callback_data="leaderboard_level_0"),
+                InlineKeyboardButton("🎮 Most Active", callback_data="leaderboard_games_0")
             ],
             [InlineKeyboardButton(text="🔙 Back", callback_data="back")]
         ]
