@@ -9,6 +9,7 @@ from handlers.mod import stats, leaderboard, achievements_callback, back_to_stat
 from handlers.challenge import challenge, challenge_callback, move_callback, clear_challenges_command, handle_rematch
 from handlers.data import manage_data_command, manage_data_callback
 from handlers.group_handler import chat_member_update
+from handler.connection import ensure_tables_exist
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -50,8 +51,6 @@ async def main():
     """Main function to run the bot."""
     logger.info("Initializing bot...")
     await ensure_tables_exist()
-    await create_migration_version_table()
-    await check_and_migrate()
     
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
