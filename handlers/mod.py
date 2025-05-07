@@ -382,45 +382,129 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle leaderboard category switches and global/group toggling."""
     query = update.callback_query
     await query.answer()
     
-    if query.data == "back":
-        # Show main leaderboard menu
-        message = "🏆 <b>Game Leaderboard</b>\n\nSelect a category to view the leaderboard:"
-        keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("🏆 Wins", callback_data="leaderboard_wins_0"),
-                InlineKeyboardButton("🎯 Challenges", callback_data="leaderboard_challenge_wins_0")
-            ],
-            [
-                InlineKeyboardButton("⭐ Levels", callback_data="leaderboard_level_0"),
-                InlineKeyboardButton("🎮 Most Active", callback_data="leaderboard_games_0")
-            ],
-            [InlineKeyboardButton("🔙 Back to Main Menu", callback_data="back_to_start")]
-        ])
-        await query.edit_message_text(text=message, parse_mode=ParseMode.HTML, reply_markup=keyboard)
-        return await safe_edit_or_reply(query, message, keyboard)
-
-        category = data[1] if len(data) > 1 else "wins"
-        group_id = int(data[2]) if len(data) > 2 and data[2].isdigit() else None
-        is_group = action == "leaderboardgroup" or "switch_to_group" in query.data
-
+    data = query.data.split("_")
+    action = data[0]
+    
+    if action in ("leaderboard", "leaderboard_group"):
+        is_group = action == "leaderboard_group"
+        category = data[1]
+        group_id = int(data[2]) if data[2] != "0" else None
+        
         if category not in ("wins", "challenge_wins", "level", "games"):
-            return await safe_edit_or_reply(query, "⚠️ Invalid leaderboard category!", InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back")]]))
-
-        if "switch_to_global" in query.data:
-            leaders = await get_leaderboard(category, 10)
-        else:
-            leaders = await get_group_leaderboard(group_id, category, 10) if is_group else await get_leaderboard(category, 10)
-
-        if not leaders:
-            message = f"⚠️ No {'group' if is_group else 'global'} {category.replace('_', ' ')} data found."
-            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back")]])
-        else:
-            message, keyboard = await format_leaderboard(leaders, category, is_group=is_group, group_id=group_id)
+            await query.message.reply_text("⚠️ Invalid leaderboard category!")
+            return
+        
+        try:
+            if is_group:
+                leaders = await get_group_leaderboard(group_id, category, 10)
+                message, keyboard = await format_leaderboard(leaders, category, is_group=True, group_id=group_id)
+            else:
+                leaders = await get_leaderboard(category, 10)
+                message, keyboard = await format_leaderboard(leaders, category, group_id=group_id)
             
-        await safe_edit_or_reply(query, message, keyboard)
+            # Check if message has text or is media
+            if query.message.text or query.message.caption:
+                if query.message.caption:
+                    await query.message.edit_caption(
+                        caption=message,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=keyboard
+                    )
+                else:
+                    await query.message.edit_text(
+                        text=message,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=keyboard
+                    )
+            else:
+                # Fallback: Send new message and delete old
+                await query.message.reply_text(
+                    message,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard
+                )
+                await query.message.delete()
+        except Exception as e:
+            logger.error(f"Error switching leaderboard category for user {query.from_user.id}: {e}")
+            await query.message.reply_text("⚠️ Error switching leaderboard category. Please try again.")
+    
+    elif action == "leaderboard_switch_to_global":
+        category = data[1]
+        group_id = int(data[2])
+        
+        if category not in ("wins", "challenge_wins", "level", "games"):
+            await query.message.reply_text("⚠️ Invalid leaderboard category!")
+            return
+        
+        try:
+            leaders = await get_leaderboard(category, 10)
+            message, keyboard = await format_leaderboard(leaders, category, group_id=group_id)
+            
+            if query.message.text or query.message.caption:
+                if query.message.caption:
+                    await query.message.edit_caption(
+                        caption=message,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=keyboard
+                    )
+                else:
+                    await query.message.edit_text(
+                        text=message,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=keyboard
+                    )
+            else:
+                await query.message.reply_text(
+                    message,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard
+                )
+                await query.message.delete()
+        except Exception as e:
+            logger.error(f"Error switching to global leaderboard for user {query.from_user.id}: {e}")
+            await query.message.reply_text("⚠️ Error switching to global leaderboard. Please try again.")
+    
+    elif action == "leaderboard_switch_to_group":
+        category = data[1]
+        group_id = int(data[2])
+        
+        if category not in ("wins", "challenge_wins", "level", "games"):
+            await query.message.reply_text("⚠️ Invalid leaderboard category!")
+            return
+        
+        try:
+            leaders = await get_group_leaderboard(group_id, category, 10)
+            message, keyboard = await format_leaderboard(leaders, category, is_group=True, group_id=group_id)
+            
+            if query.message.text or query.message.caption:
+                if query.message.caption:
+                    await query.message.edit_caption(
+                        caption=message,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=keyboard
+                    )
+                else:
+                    await query.message.edit_text(
+                        text=message,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=keyboard
+                    )
+            else:
+                await query.message.reply_text(
+                    message,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard
+                )
+                await query.message.delete()
+        except Exception as e:
+            logger.error(f"Error switching to group leaderboard for user {query.from_user.id}: {e}")
+            await query.message.reply_text("⚠️ Error switching to group leaderboard. Please try again.")
+            
+
 
 async def show_leaderboard(query, leaders, category):
     """Displays the leaderboard based on the selected category."""
