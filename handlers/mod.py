@@ -461,10 +461,10 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Get system stats
-    stats = await get_system_stats()
+    stats_data = await get_system_stats()
 
     # Handle None response
-    if stats is None:
+    if stats_data is None:
         await update.message.reply_text("⚠️ Failed to fetch system stats.")
         return
 
