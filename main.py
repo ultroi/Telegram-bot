@@ -23,7 +23,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Use absolute path for database file
-DB_DIR = Path(__file__).parent.parent / "database"
+DB_DIR = Path(__file__).parent.parent / "db"
 DB_DIR.mkdir(exist_ok=True, mode=0o755)  # Ensure proper permissions
 DB_PATH = DB_DIR / "trihand.db"
 
