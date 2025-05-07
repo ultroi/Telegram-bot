@@ -14,6 +14,9 @@ from database.connection import (
 )
 from datetime import datetime, timedelta
 import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Stats command
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
