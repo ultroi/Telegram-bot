@@ -398,11 +398,18 @@ async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                 leaders = await get_leaderboard(category, 10)
                 message, keyboard = await format_leaderboard(leaders, category, group_id=group_id)
             
-            await query.edit_message_text(
-                message,
-                parse_mode=ParseMode.HTML,
-                reply_markup=keyboard
-            )
+        try:
+                await query.edit_message_text(
+                    message,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard
+                )
+            except Exception:
+                await query.edit_message_caption(
+                    caption=message,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard
+                )
         except Exception as e:
             logger.error(f"Error switching leaderboard category for user {query.from_user.id}: {e}")
             await query.edit_message_text("⚠️ Error switching leaderboard category. Please try again.")
@@ -420,11 +427,18 @@ async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             leaders = await get_leaderboard(category, 10)
             message, keyboard = await format_leaderboard(leaders, category, group_id=group_id)
             
-            await query.edit_message_text(
-                message,
-                parse_mode=ParseMode.HTML,
-                reply_markup=keyboard
-            )
+        try:
+                await query.edit_message_text(
+                    message,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard
+                )
+            except Exception:
+                await query.edit_message_caption(
+                    caption=message,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard
+                )
         except Exception as e:
             logger.error(f"Error switching to global leaderboard for user {query.from_user.id}: {e}")
             await query.edit_message_text("⚠️ Error switching to global leaderboard. Please try again.")
@@ -442,11 +456,18 @@ async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             leaders = await get_group_leaderboard(group_id, category, 10)
             message, keyboard = await format_leaderboard(leaders, category, is_group=True, group_id=group_id)
             
-            await query.edit_message_text(
-                message,
-                parse_mode=ParseMode.HTML,
-                reply_markup=keyboard
-            )
+        try:
+                await query.edit_message_text(
+                    message,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard
+                )
+            except Exception:
+                await query.edit_message_caption(
+                    caption=message,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard
+                )
         except Exception as e:
             logger.error(f"Error switching to group leaderboard for user {query.from_user.id}: {e}")
             await query.edit_message_text("⚠️ Error switching to group leaderboard. Please try again.")
