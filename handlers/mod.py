@@ -9,7 +9,8 @@ from database.connection import (
     get_system_stats,
     get_broadcast_users,
     get_user_achievements,
-    get_group_leaderboard
+    get_group_leaderboard,
+    is_admin
 )
 from datetime import datetime, timedelta
 import asyncio
@@ -452,8 +453,7 @@ async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin command to view system statistics."""
     # Check if user is admin
-    admin_ids = [5956598856]
-    if update.message.from_user.id not in admin_ids:
+    if update.message.from_user.id not in is_admin:
         await update.message.reply_text("⛔ You are not authorized to use this command.")
         return
 
@@ -473,7 +473,6 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👥 <b>Groups:</b> {stats_data['total_groups']}\n"
         f"🎮 <b>Total Games:</b> {stats_data['total_games']}\n"
     )
-
     await update.message.reply_text(
         stats_message,
         parse_mode=ParseMode.HTML
@@ -483,8 +482,7 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin command to broadcast a message to all users."""
     # Check if user is admin
-    admin_ids = [5956598856]  # Add admin IDs here
-    if update.message.from_user.id not in admin_ids:
+    if update.message.from_user.id not in is_admin:
         await update.message.reply_text("⛔ You are not authorized to use this command.")
         return
     
@@ -516,9 +514,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def confirm_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Confirm and execute the broadcast."""
-    admin_ids = [5956598856]  # Add admin IDs here
-
-    if update.message.from_user.id not in admin_ids:
+    if update.message.from_user.id not in is_admin:
         await update.message.reply_text("⛔ You are not authorized to use this command.")
         return
 
