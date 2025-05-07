@@ -483,9 +483,9 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin command to broadcast a message to all users."""
+    user_id = update.effective_user.id  # Define user_id
     # Check if user is admin
-    if update.message.from_user.id not in is_admin:
+    if await is_admin(user_id):
         await update.message.reply_text("⛔ You are not authorized to use this command.")
         return
     
@@ -516,8 +516,9 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["broadcast_users"] = user_ids
 
 async def confirm_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Confirm and execute the broadcast."""
-    if update.message.from_user.id not in is_admin:
+    user_id = update.effective_user.id  # Define user_id
+    # Check if user is admin
+    if await is_admin(user_id):
         await update.message.reply_text("⛔ You are not authorized to use this command.")
         return
 
