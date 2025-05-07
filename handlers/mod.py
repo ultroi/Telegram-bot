@@ -456,7 +456,7 @@ async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id  # Define user_id
     # Check if user is admin
-    if await is_admin(user_id):
+    if not await is_admin(user_id):
         await update.message.reply_text("⛔ You are not authorized to use this command.")
         return
 
@@ -485,7 +485,7 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id  # Define user_id
     # Check if user is admin
-    if await is_admin(user_id):
+    if not await is_admin(user_id):
         await update.message.reply_text("⛔ You are not authorized to use this command.")
         return
     
@@ -518,7 +518,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def confirm_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id  # Define user_id
     # Check if user is admin
-    if await is_admin(user_id):
+    if not await is_admin(user_id):
         await update.message.reply_text("⛔ You are not authorized to use this command.")
         return
 
