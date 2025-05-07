@@ -6,7 +6,10 @@ from pathlib import Path
 import shutil
 import os
 
-
+# Use absolute path for database file
+DB_DIR = Path("/app/db") 
+DB_DIR.mkdir(exist_ok=True)  # Ensure proper permissions
+DB_PATH = DB_DIR / "trihand.db"
 
 @asynccontextmanager
 async def get_db_connection():
