@@ -2,20 +2,29 @@ import sqlite3
 from contextlib import asynccontextmanager
 import aiosqlite
 from datetime import datetime, timedelta
+from pathlib import Path
 import shutil
 import os
+
+# At the top of your database/connection.py file:
+DB_DIR = Path("data")  # Create a data directory
+DB_DIR.mkdir(exist_ok=True)  # Ensure it exists
+DB_PATH = DB_DIR / "trihand.db"  # Full path to database
+
 
 @asynccontextmanager
 async def get_db_connection():
     """Provide an asynchronous SQLite database connection."""
-    conn = await aiosqlite.connect('trihand.db')
+    conn = await aiosqlite.connect(DB_PATH)
     try:
         conn.row_factory = aiosqlite.Row
         yield conn
     except sqlite3.Error as e:
         print(f"Database error: {e}")
+        raise
     finally:
         await conn.close()
+
 
 async def is_admin(user_id):
     """Check if a user is an admin."""
@@ -23,7 +32,7 @@ async def is_admin(user_id):
     return user_id in [5956598856]  # Update with actual admin IDs
 
 async def ensure_tables_exist():
-    """Ensure all necessary tables and indexes exist in the database."""
+    os.makedirs(DB_DIR, exist_ok=True)
     async with get_db_connection() as conn:
         try:
             # Users table
