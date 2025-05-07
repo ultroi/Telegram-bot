@@ -311,14 +311,15 @@ async def format_leaderboard(leaders: list, category: str, is_group: bool = Fals
             leaderboard_message += f"{rank_display} <b>{name}</b> - {leader['total_games']} games played (Level {leader['level']})\n"
     
     # Create buttons
+    prefix = "leaderboard_group_" if is_group else "leaderboard_"
     keyboard = [
         [
-            InlineKeyboardButton("🏆 Wins", callback_data=f"leaderboard_{'group_' if is_group else ''}{category}_wins_{group_id or 0}"),
-            InlineKeyboardButton("🎯 Challenges", callback_data=f"leaderboard_{'group_' if is_group else ''}{category}_challenge_wins_{group_id or 0}")
+            InlineKeyboardButton("🏆 Wins", callback_data=f"{prefix}wins_{group_id or 0}"),
+            InlineKeyboardButton("🎯 Challenges", callback_data=f"{prefix}challenge_wins_{group_id or 0}")
         ],
         [
-            InlineKeyboardButton("⭐ Levels", callback_data=f"leaderboard_{'group_' if is_group else ''}{category}_level_{group_id or 0}"),
-            InlineKeyboardButton("🎮 Most Active", callback_data=f"leaderboard_{'group_' if is_group else ''}{category}_games_{group_id or 0}")
+            InlineKeyboardButton("⭐ Levels", callback_data=f"{prefix}level_{group_id or 0}"),
+            InlineKeyboardButton("🎮 Most Active", callback_data=f"{prefix}games_{group_id or 0}")
         ]
     ]
     
@@ -365,6 +366,8 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Error displaying leaderboard for user {user.id} in chat {chat.id}: {e}")
         await update.message.reply_text("⚠️ Error displaying leaderboard. Please try again.")
 
+
+
 async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle leaderboard category switches and global/group toggling."""
     query = update.callback_query
@@ -373,20 +376,23 @@ async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     data = query.data.split("_")
     action = data[0]
     
-    if action == "leaderboard":
+    if action == "leaderboard" or action == "leaderboard_group":
         # Category switch within the same leaderboard type
-        is_group = data[1] == "group"
-        current_category = data[2]
-        new_category = data[3]
-        group_id = int(data[4]) if data[4] != "0" else None
+        is_group = action == "leaderboard_group"
+        category = data[1]
+        group_id = int(data[2]) if data[2] != "0" else None
+        
+        if category not in ("wins", "challenge_wins", "level", "games"):
+            await query.edit_message_text("⚠️ Invalid leaderboard category!")
+            return
         
         try:
             if is_group:
-                leaders = await get_group_leaderboard(group_id, new_category, 10)
-                message, keyboard = await format_leaderboard(leaders, new_category, is_group=True, group_id=group_id)
+                leaders = await get_group_leaderboard(group_id, category, 10)
+                message, keyboard = await format_leaderboard(leaders, category, is_group=True, group_id=group_id)
             else:
-                leaders = await get_leaderboard(new_category, 10)
-                message, keyboard = await format_leaderboard(leaders, new_category, group_id=group_id)
+                leaders = await get_leaderboard(category, 10)
+                message, keyboard = await format_leaderboard(leaders, category, group_id=group_id)
             
             await query.edit_message_text(
                 message,
@@ -401,6 +407,10 @@ async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         # Switch from group to global leaderboard
         category = data[1]
         group_id = int(data[2])
+        
+        if category not in ("wins", "challenge_wins", "level", "games"):
+            await query.edit_message_text("⚠️ Invalid leaderboard category!")
+            return
         
         try:
             leaders = await get_leaderboard(category, 10)
@@ -420,6 +430,10 @@ async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         category = data[1]
         group_id = int(data[2])
         
+        if category not in ("wins", "challenge_wins", "level", "games"):
+            await query.edit_message_text("⚠️ Invalid leaderboard category!")
+            return
+        
         try:
             leaders = await get_group_leaderboard(group_id, category, 10)
             message, keyboard = await format_leaderboard(leaders, category, is_group=True, group_id=group_id)
@@ -432,64 +446,7 @@ async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         except Exception as e:
             logger.error(f"Error switching to group leaderboard for user {query.from_user.id}: {e}")
             await query.edit_message_text("⚠️ Error switching to group leaderboard. Please try again.")
-
-# Leaderboard callback for switching categories
-async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    
-    _, category = query.data.split("_", 1)
-    
-    # Get leaderboard data for the selected category
-    leaders = await get_leaderboard(category, 10)
-    
-    if not leaders:
-        await query.edit_message_text("No players found on the leaderboard yet!")
-        return
-    
-    # Re-create leaderboard message for the new category
-    category_titles = {
-        "wins": "🏆 Most Wins",
-        "challenge_wins": "🎯 Challenge Champions",
-        "level": "⭐ Highest Levels",
-        "games": "🎮 Most Active Players"
-    }
-    
-    leaderboard_message = f"📊 <b>{category_titles[category]} Leaderboard</b> 📊\n\n"
-    
-    # Medals for top 3
-    medals = ["🥇", "🥈", "🥉"]
-    
-    for i, leader in enumerate(leaders):
-        rank_display = medals[i] if i < 3 else f"{i+1}."
-        name = f"{leader['first_name']} {leader['last_name'] or ''}".strip()
-        
-        if category == "wins":
-            leaderboard_message += f"{rank_display} <b>{name}</b> - {leader['total_wins']} wins (Level {leader['level']})\n"
-        elif category == "challenge_wins":
-            leaderboard_message += f"{rank_display} <b>{name}</b> - {leader['challenge_wins']} challenge wins (Level {leader['level']})\n"
-        elif category == "level":
-            leaderboard_message += f"{rank_display} <b>{name}</b> - Level {leader['level']} ({leader['experience_points']} XP)\n"
-        elif category == "games":
-            leaderboard_message += f"{rank_display} <b>{name}</b> - {leader['total_games']} games played (Level {leader['level']})\n"
-    
-    # Keep the same buttons
-    keyboard = [
-        [
-            InlineKeyboardButton("🏆 Wins", callback_data="leaderboard_wins"),
-            InlineKeyboardButton("🎯 Challenges", callback_data="leaderboard_challenge_wins")
-        ],
-        [
-            InlineKeyboardButton("⭐ Levels", callback_data="leaderboard_level"),
-            InlineKeyboardButton("🎮 Most Active", callback_data="leaderboard_games")
-        ]
-    ]
-    
-    await query.edit_message_text(
-        leaderboard_message,
-        parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+            
 
 # Admin commands
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
