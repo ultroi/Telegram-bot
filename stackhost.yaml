@@ -15,3 +15,7 @@ commands:
 
 env:
   - "ENVIRONMENT=production"
+
+volumes:
+  - name: db_data
+    path: /app/data
