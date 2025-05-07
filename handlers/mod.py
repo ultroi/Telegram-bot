@@ -595,3 +595,13 @@ async def confirm_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"✅ Broadcast complete!\n\n✅ Successful: {successful}\n❌ Failed: {failed}"
     )
 
+
+async def safe_edit_or_reply(query, message, keyboard):
+    try:
+        if hasattr(query.message, "photo") and query.message.photo:
+            await query.edit_message_caption(caption=message, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+        else:
+            await query.edit_message_text(text=message, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+    except Exception as e:
+        logger.warning(f"Fallback to reply due to edit error: {e}")
+        await query.message.reply_text(text=message, parse_mode=ParseMode.HTML, reply_markup=keyboard)
