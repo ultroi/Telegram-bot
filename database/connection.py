@@ -6,23 +6,29 @@ from pathlib import Path
 import shutil
 import os
 
-# At the top of your database/connection.py file:
-DB_DIR = Path("data")  # Create a data directory
-DB_DIR.mkdir(exist_ok=True)  # Ensure it exists
-DB_PATH = DB_DIR / "trihand.db"  # Full path to database
-
+# Use absolute path for database file
+DB_DIR = Path(__file__).parent.parent / "data"
+DB_DIR.mkdir(exist_ok=True, mode=0o755)  # Ensure proper permissions
+DB_PATH = DB_DIR / "trihand.db"
 
 @asynccontextmanager
 async def get_db_connection():
-    """Provide an asynchronous SQLite database connection."""
-    conn = await aiosqlite.connect(DB_PATH)
+    """Provide a persistent database connection."""
+    # Configure SQLite for better durability
+    conn = await aiosqlite.connect(
+        str(DB_PATH),
+        isolation_level="IMMEDIATE",  # Better transaction control
+        timeout=30,  # Longer timeout for busy conditions
+    )
+    
     try:
+        # Enable WAL mode for better concurrency
+        await conn.execute("PRAGMA journal_mode=WAL")
+        await conn.execute("PRAGMA synchronous=NORMAL")
         conn.row_factory = aiosqlite.Row
         yield conn
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
-        raise
     finally:
+        # Ensure connection is properly closed
         await conn.close()
 
 
