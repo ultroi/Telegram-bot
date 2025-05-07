@@ -22,11 +22,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Use absolute path for database file
-DB_DIR = Path("/app/db") 
-DB_DIR.mkdir(exist_ok=True)  # Ensure proper permissions
-DB_PATH = DB_DIR / "trihand.db"
-
 # Get credentials from environment variables
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
