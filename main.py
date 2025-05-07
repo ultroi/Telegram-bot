@@ -3,6 +3,7 @@ import logging
 import asyncio
 import signal
 from telegram import Update
+from pathlib import Path
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes, ChatMemberHandler
 from handlers.start import start, start_callback, handle_bot_move
 from handlers.mod import stats, leaderboard, achievements_callback, back_to_stats_callback, leaderboard_callback, admin_stats
@@ -21,27 +22,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+DB_DIR = Path("data")
+DB_DIR.mkdir(exist_ok=True)
+
 # Get credentials from environment variables
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN not found in environment variables.")
-
-async def shutdown(application):
-    """Gracefully shut down the application."""
-    logger.info("Shutting down bot...")
-    await application.stop()
-    await application.shutdown()
-    logger.info("Bot shutdown complete.")
-
-def handle_shutdown(loop, application):
-    """Handle SIGTERM/SIGINT for graceful shutdown."""
-    tasks = [task for task in asyncio.all_tasks(loop) if task is not asyncio.current_task()]
-    for task in tasks:
-        task.cancel()
-    loop.run_until_complete(shutdown(application))
-    loop.run_until_complete(loop.shutdown_asyncgens())
-    loop.close()
-    logger.info("Event loop closed.")
 
 # Error handler
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -50,7 +37,14 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 async def main():
     """Main function to run the bot."""
     logger.info("Initializing bot...")
-    await ensure_tables_exist()
+    
+    try:
+        # Initialize database with proper path handling
+        await ensure_tables_exist()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+        raise
     
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -74,28 +68,84 @@ async def main():
     app.add_handler(ChatMemberHandler(chat_member_update, ChatMemberHandler.MY_CHAT_MEMBER))
     app.add_error_handler(error_handler)
 
-    # Set up signal handlers for graceful shutdown
+    # Enhanced shutdown handling
+    async def enhanced_shutdown():
+        """Enhanced shutdown procedure with database safety checks."""
+        logger.info("Starting graceful shutdown...")
+        try:
+            if app.updater:
+                await app.updater.stop()
+            await app.stop()
+            await app.shutdown()
+            
+            # Verify database file exists
+            if not Path("data/trihand.db").exists():
+                logger.warning("Database file not found after shutdown!")
+            else:
+                logger.info("Database file verified")
+                
+        except Exception as e:
+            logger.error(f"Error during shutdown: {e}")
+        finally:
+            logger.info("Shutdown complete")
+
+    # Signal handling with database protection
+    def handle_signal(signame):
+        logger.info(f"Received {signame}, initiating shutdown...")
+        asyncio.create_task(enhanced_shutdown())
+
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(sig, handle_shutdown, loop, app)
+        loop.add_signal_handler(sig, lambda: handle_signal(sig.name))
+
+    # Startup checks
+    logger.info("Running startup checks...")
+    if not BOT_TOKEN:
+        logger.error("No BOT_TOKEN found!")
+        raise ValueError("BOT_TOKEN not set")
     
-    logger.info("Starting bot polling...")
+    if not Path("data/trihand.db").exists():
+        logger.warning("No existing database found - creating new one")
+
     try:
+        logger.info("Starting bot polling...")
         await app.initialize()
         await app.start()
-        await app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
-        # Keep the bot running until stopped
+        
+        # Start updater with proper error handling
+        if app.updater:
+            await app.updater.start_polling(
+                allowed_updates=Update.ALL_TYPES,
+                drop_pending_updates=True
+            )
+        
+        # Keep the bot running
         await asyncio.Event().wait()
+        
     except asyncio.CancelledError:
-        logger.info("Received shutdown signal, stopping bot...")
+        logger.info("Shutdown requested")
+    except Exception as e:
+        logger.error(f"Fatal error in main loop: {e}")
+        raise
     finally:
-        await shutdown(app)
+        await enhanced_shutdown()
 
 if __name__ == "__main__":
     try:
+        # Configure logging to file
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            handlers=[
+                logging.FileHandler("bot.log"),
+                logging.StreamHandler()
+            ]
+        )
+        
+        logger.info("Starting application...")
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")
     except Exception as e:
-        logger.error(f"Fatal error: {e}")
+        logger.error(f"Application failed: {e}")
         raise
