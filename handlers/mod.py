@@ -371,107 +371,71 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Error displaying leaderboard. Please try again.")
 
 
-
 async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle leaderboard category switches and global/group toggling."""
     query = update.callback_query
     await query.answer()
-    
+
     data = query.data.split("_")
     action = data[0]
-    
-    if action == "leaderboard" or action == "leaderboard_group":
-        # Category switch within the same leaderboard type
-        is_group = action == "leaderboard_group"
-        category = data[1]
-        group_id = int(data[2]) if data[2] != "0" else None
-        
-        if category not in ("wins", "challenge_wins", "level", "games"):
-            await query.edit_message_text("⚠️ Invalid leaderboard category!")
-            return
-        
-        try:
+
+    try:
+        if action == "leaderboard" or action == "leaderboard_group":
+            is_group = action == "leaderboard_group"
+            category = data[1]
+            group_id = int(data[2]) if data[2] != "0" else None
+
+            if category not in ("wins", "challenge_wins", "level", "games"):
+                await query.edit_message_text("⚠️ Invalid leaderboard category!")
+                return
+
             if is_group:
                 leaders = await get_group_leaderboard(group_id, category, 10)
                 message, keyboard = await format_leaderboard(leaders, category, is_group=True, group_id=group_id)
             else:
                 leaders = await get_leaderboard(category, 10)
                 message, keyboard = await format_leaderboard(leaders, category, group_id=group_id)
-            
-        try:
-                await query.edit_message_text(
-                    message,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=keyboard
-                )
-            except Exception:
-                await query.edit_message_caption(
-                    caption=message,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=keyboard
-                )
-        except Exception as e:
-            logger.error(f"Error switching leaderboard category for user {query.from_user.id}: {e}")
-            await query.edit_message_text("⚠️ Error switching leaderboard category. Please try again.")
-    
-    elif action == "leaderboard_switch_to_global":
-        # Switch from group to global leaderboard
-        category = data[1]
-        group_id = int(data[2])
-        
-        if category not in ("wins", "challenge_wins", "level", "games"):
-            await query.edit_message_text("⚠️ Invalid leaderboard category!")
-            return
-        
-        try:
+
+        elif action == "leaderboard_switch_to_global":
+            category = data[1]
+            group_id = int(data[2])
+
+            if category not in ("wins", "challenge_wins", "level", "games"):
+                await query.edit_message_text("⚠️ Invalid leaderboard category!")
+                return
+
             leaders = await get_leaderboard(category, 10)
             message, keyboard = await format_leaderboard(leaders, category, group_id=group_id)
-            
-        try:
-                await query.edit_message_text(
-                    message,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=keyboard
-                )
-            except Exception:
-                await query.edit_message_caption(
-                    caption=message,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=keyboard
-                )
-        except Exception as e:
-            logger.error(f"Error switching to global leaderboard for user {query.from_user.id}: {e}")
-            await query.edit_message_text("⚠️ Error switching to global leaderboard. Please try again.")
-    
-    elif action == "leaderboard_switch_to_group":
-        # Switch from global to group leaderboard
-        category = data[1]
-        group_id = int(data[2])
-        
-        if category not in ("wins", "challenge_wins", "level", "games"):
-            await query.edit_message_text("⚠️ Invalid leaderboard category!")
-            return
-        
-        try:
+
+        elif action == "leaderboard_switch_to_group":
+            category = data[1]
+            group_id = int(data[2])
+
+            if category not in ("wins", "challenge_wins", "level", "games"):
+                await query.edit_message_text("⚠️ Invalid leaderboard category!")
+                return
+
             leaders = await get_group_leaderboard(group_id, category, 10)
             message, keyboard = await format_leaderboard(leaders, category, is_group=True, group_id=group_id)
-            
+
+        # Try editing the message text; if it fails (e.g., captioned image), try editing caption
         try:
-                await query.edit_message_text(
-                    message,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=keyboard
-                )
-            except Exception:
-                await query.edit_message_caption(
-                    caption=message,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=keyboard
-                )
-        except Exception as e:
-            logger.error(f"Error switching to group leaderboard for user {query.from_user.id}: {e}")
-            await query.edit_message_text("⚠️ Error switching to group leaderboard. Please try again.")
-            
+            await query.edit_message_text(
+                text=message,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard
+            )
+        except Exception:
+            await query.edit_message_caption(
+                caption=message,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard
+            )
+
+    except Exception as e:
+        logger.error(f"Error handling leaderboard callback for user {query.from_user.id}: {e}")
+        await query.edit_message_text("⚠️ An error occurred while switching leaderboard. Please try again.")
+
 
 # Admin commands
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
