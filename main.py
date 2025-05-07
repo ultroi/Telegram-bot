@@ -57,7 +57,7 @@ async def main():
     app.add_handler(CallbackQueryHandler(achievements_callback, pattern=r"^achievements_\d+$"))
     app.add_handler(CallbackQueryHandler(back_to_stats_callback, pattern=r"^back_to_stats_\d+$"))
     app.add_handler(CallbackQueryHandler(start_callback, pattern="^(help|stats|quick_game)$"))
-    app.add_handler(CallbackQueryHandler(leaderboard_callback, pattern="^leaderboard_"))
+    app.add_handler(CallbackQueryHandler(leaderboard_callback, pattern=r"^leaderboard_.*$"))
     app.add_handler(CallbackQueryHandler(leaderboard_callback, pattern="^leaderboardgroup_"))
     app.add_handler(CallbackQueryHandler(leaderboard_callback, pattern="^back$"))
     app.add_handler(CallbackQueryHandler(start_callback, pattern="^back_to_start$"))
