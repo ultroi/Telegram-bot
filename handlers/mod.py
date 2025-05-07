@@ -419,13 +419,8 @@ async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back")]])
         else:
             message, keyboard = await format_leaderboard(leaders, category, is_group=is_group, group_id=group_id)
-
+            
         await safe_edit_or_reply(query, message, keyboard)
-
-    except Exception as e:
-        logger.error(f"Error handling leaderboard callback for user {query.from_user.id}: {e}")
-        await query.message.reply_text("⚠️ An error occurred while switching leaderboard.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back")]]))
-
 
 async def show_leaderboard(query, leaders, category):
     """Displays the leaderboard based on the selected category."""
