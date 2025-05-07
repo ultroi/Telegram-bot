@@ -451,9 +451,9 @@ async def leaderboard_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # Admin commands
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin command to view system statistics."""
+    user_id = update.effective_user.id  # Define user_id
     # Check if user is admin
-    if update.message.from_user.id not in is_admin:
+    if await is_admin(user_id):
         await update.message.reply_text("⛔ You are not authorized to use this command.")
         return
 
