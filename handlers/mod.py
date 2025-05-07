@@ -511,10 +511,10 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Build and send stats message
     stats_message = (
         f"🤖 <b>System Statistics</b> 🤖\n\n"
-        f"👥 <b>Users:</b> {stats.get('total_users', 'N/A')}\n"
-        f"👥 <b>Active Users (7d):</b> {stats.get('active_users', 'N/A')}\n"
-        f"👥 <b>Groups:</b> {stats.get('total_groups', 'N/A')}\n"
-        f"🎮 <b>Total Games:</b> {stats.get('total_games', 'N/A')}\n"
+        f"👥 <b>Users:</b> {stats_data['total_users']}\n"
+        f"👥 <b>Active Users (7d):</b> {stats_data['active_users']}\n"
+        f"👥 <b>Groups:</b> {stats_data['total_groups']}\n"
+        f"🎮 <b>Total Games:</b> {stats_data['total_games']}\n"
     )
 
     await update.message.reply_text(
