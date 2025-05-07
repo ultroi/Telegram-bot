@@ -58,14 +58,33 @@ async def create_migration_version_table():
 async def check_and_migrate():
     """Check if migration is required and perform migration."""
     async with get_db_connection() as conn:
-        # Check if migration has already been done
+        # Check if migration_version table exists
+        result = await conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='migration_version'")
+        table_exists = await result.fetchone()
+        
+        if not table_exists:
+            # First time setup, just ensure tables exist without wiping
+            await ensure_tables_exist()
+            await conn.execute('INSERT INTO migration_version (version) VALUES ("1.0")')
+            await conn.commit()
+            logger.info("Created migration version table and initialized to 1.0")
+            return
+            
+        # Check current version
         result = await conn.execute('SELECT version FROM migration_version ORDER BY migrated_at DESC LIMIT 1')
         version = await result.fetchone()
 
-        if version is None or version[0] != '1.0':  # Example version check
-            await migrate_schema()  # Run migration only if version doesn't match
-            await conn.execute('INSERT INTO migration_version (version) VALUES ("1.0")')  # Update version to "1.0"
+        # Run specific migrations based on version
+        if version is None:
+            # No version record, but table exists - just add current version
+            await conn.execute('INSERT INTO migration_version (version) VALUES ("1.0")')
             await conn.commit()
+        elif version[0] != '1.0':
+            # For future migrations, use migrate_stats() for non-destructive migrations
+            await migrate_stats()  # Use migrate_stats instead of migrate_schema
+            await conn.execute('INSERT INTO migration_version (version) VALUES ("1.0")')
+            await conn.commit()
+            logger.info("Migration completed to version 1.0")
 
 # Error handler
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
